@@ -1,0 +1,48 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Team {
+  id      BigInt   @id @default(autoincrement())
+  name    String
+  leader  String
+  workers Worker[]
+}
+
+model Worker {
+  id           BigInt        @id @default(autoincrement())
+  name         String
+  teamId       BigInt?
+  team         Team?         @relation(fields: [teamId], references: [id])
+  dailyReports DailyReport[]
+}
+
+model Website {
+  id           BigInt        @id @default(autoincrement())
+  name         String
+  dailyReports DailyReport[]
+}
+
+model DailyReport {
+  id          BigInt   @id @default(autoincrement())
+  workerId    BigInt?
+  worker      Worker?  @relation(fields: [workerId], references: [id])
+  websiteId   BigInt?
+  website     Website? @relation(fields: [websiteId], references: [id])
+  date        DateTime @db.Date
+  startAmount Decimal  @db.Decimal
+  endAmount   Decimal  @db.Decimal
+
+  @@index([workerId, date], name: "idx_reports_worker_date")
+  @@index([websiteId, date], name: "idx_reports_website_date")
+}
