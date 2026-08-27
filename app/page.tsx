@@ -7,7 +7,12 @@ import { DailyChart } from "@/components/dashboard/daily-chart";
 import { SiteBreakdown } from "@/components/dashboard/site-breakdown";
 import { RecentHistory } from "@/components/dashboard/recent-history";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   TrendingUpIcon,
   TrophyIcon,
@@ -43,7 +48,10 @@ export default async function DashboardPage() {
   const dailyData = Array.from(dailyMap.entries())
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([day, total]) => ({
-      day: day.slice(5),
+      day: new Date(day + "T00:00:00").toLocaleDateString("es-ES", {
+        day: "numeric",
+        month: "short",
+      }),
       total: Math.round(total * 100) / 100,
     }));
 
@@ -141,7 +149,7 @@ export default async function DashboardPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <DailyChart data={dailyData} average={avgMonth} />
+          <DailyChart data={dailyData} />
         </CardContent>
       </Card>
 

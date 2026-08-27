@@ -6,11 +6,10 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
-import { Line, LineChart, XAxis, YAxis, ReferenceLine } from "recharts";
+import { Line, LineChart, XAxis, YAxis, CartesianGrid } from "recharts";
 
 interface DailyChartProps {
   data: { day: string; total: number }[];
-  average: number;
 }
 
 const chartConfig = {
@@ -20,37 +19,38 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
-export function DailyChart({ data, average }: DailyChartProps) {
+export function DailyChart({ data }: DailyChartProps) {
+  const max = Math.max(...data.map((d) => d.total));
+
   return (
-    <div className="w-full">
-      <ChartContainer config={chartConfig} className="h-[200px] w-full">
-        <LineChart data={data} margin={{ top: 12, right: 8, left: -18, bottom: 0 }}>
-          <XAxis
-            dataKey="day"
-            tick={{ fontSize: 10 }}
-            axisLine={{ stroke: "hsl(var(--border))" }}
-            tickLine={false}
-          />
-          <YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
-          <ChartTooltip content={<ChartTooltipContent />} />
-          <ReferenceLine
-            y={average}
-            stroke="hsl(var(--muted-foreground))"
-            strokeDasharray="3 3"
-          />
-          <Line
-            type="monotone"
-            dataKey="total"
-            stroke="var(--color-total)"
-            strokeWidth={2}
-            dot={{ r: 3, fill: "var(--color-total)" }}
-            activeDot={{ r: 5 }}
-          />
-        </LineChart>
-      </ChartContainer>
-      <p className="mt-2 text-right text-xs text-muted-foreground">
-        Línea punteada = promedio (${average.toFixed(2)})
-      </p>
-    </div>
+    <ChartContainer config={chartConfig} className="h-40 w-full">
+      <LineChart data={data} margin={{ right: 8, top: 8 }}>
+        <CartesianGrid />
+        <XAxis
+          dataKey="day"
+          interval={Math.floor(data.length / 6)}
+          tickLine={false}
+          axisLine={false}
+          tickMargin={8}
+          // tick={{ fontSize: 10 }}
+        />
+        <YAxis
+          domain={[0, max]}
+          tickLine={false}
+          axisLine={false}
+          tickMargin={8}
+          // tick={{ fontSize: 10 }}
+        />
+        <ChartTooltip content={<ChartTooltipContent />} />
+        <Line
+          type="monotone"
+          dataKey="total"
+          stroke="var(--color-total)"
+          strokeWidth={2}
+          dot={{ r: 3, fill: "var(--color-total)" }}
+          activeDot={{ r: 5 }}
+        />
+      </LineChart>
+    </ChartContainer>
   );
 }
