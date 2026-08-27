@@ -1,35 +1,122 @@
-import { Badge } from "@/components/ui/badge";
+"use client"
+
+import { TrendingUp } from "lucide-react"
+import { Bar, BarChart, CartesianGrid, LabelList, XAxis, YAxis } from "recharts"
+
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/components/ui/chart"
+import { cn } from "@/lib/utils"
+import { formatMoney } from "@/lib/format"
 
 interface SiteData {
-  name: string;
-  total: number;
+  name: string
+  total: number
 }
 
 interface SiteBreakdownProps {
-  data: SiteData[];
+  data: SiteData[]
+  rangeLabel: string
+  className?: string
 }
 
-export function SiteBreakdown({ data }: SiteBreakdownProps) {
-  const maxSite = Math.max(...data.map((s) => s.total));
+const chartConfig = {
+  total: {
+    label: "Ganancia",
+    color: "var(--chart-2)",
+  },
+  label: {
+    color: "var(--background)",
+  },
+} satisfies ChartConfig
+
+export function SiteBreakdown({ data, rangeLabel, className }: SiteBreakdownProps) {
+  const total = data.reduce((acc, site) => acc + site.total, 0)
+  const bestSite = data.reduce<SiteData | null>(
+    (best, site) => (best === null || site.total > best.total ? site : best),
+    null
+  )
 
   return (
-    <div className="space-y-4">
-      {data.map((site) => (
-        <div key={site.name}>
-          <div className="mb-1 flex items-center justify-between text-sm">
-            <span>{site.name}</span>
-            <Badge variant="secondary" className="font-mono">
-              ${site.total.toFixed(2)}
-            </Badge>
-          </div>
-          <div className="h-2 rounded-full bg-muted">
-            <div
-              className="h-full rounded-full bg-primary"
-              style={{ width: `${(site.total / maxSite) * 100}%` }}
+    <Card className={cn(className)}>
+      <CardHeader>
+        <CardTitle className="text-base">Ganancia por sitio</CardTitle>
+        <CardDescription className="capitalize">{rangeLabel}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <ChartContainer config={chartConfig} className="h-56 w-full">
+          <BarChart
+            accessibilityLayer
+            data={data}
+            layout="vertical"
+            margin={{
+              right: 16,
+            }}
+          >
+            <CartesianGrid horizontal={false} />
+            <YAxis
+              dataKey="name"
+              type="category"
+              tickLine={false}
+              tickMargin={10}
+              axisLine={false}
+              hide
             />
-          </div>
+            <XAxis dataKey="total" type="number" hide />
+            <ChartTooltip
+              cursor={false}
+              content={
+                <ChartTooltipContent
+                  indicator="line"
+                  hideLabel
+                  formatter={(value) => formatMoney(Number(value))}
+                />
+              }
+            />
+            <Bar dataKey="total" fill="var(--color-total)" radius={4}>
+              <LabelList
+                dataKey="name"
+                position="insideLeft"
+                offset={8}
+                className="fill-(--color-label)"
+                fontSize={12}
+              />
+              <LabelList
+                dataKey="total"
+                position="right"
+                offset={8}
+                className="fill-foreground"
+                fontSize={12}
+                formatter={(value) => formatMoney(Number(value))}
+              />
+            </Bar>
+          </BarChart>
+        </ChartContainer>
+      </CardContent>
+      <CardFooter className="flex-col items-end gap-2 text-sm">
+        <div className="flex gap-2 leading-none font-medium">
+          {bestSite && (
+            <>
+              Mejor sitio: {bestSite.name}
+              <TrendingUp className="h-4 w-4" />
+            </>
+          )}
         </div>
-      ))}
-    </div>
-  );
+        <div className="leading-none text-muted-foreground">
+          Ganancia total: {formatMoney(total)} · {rangeLabel}
+        </div>
+      </CardFooter>
+    </Card>
+  )
 }

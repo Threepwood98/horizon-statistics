@@ -6,6 +6,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { formatMoney } from "@/lib/format";
 
 interface HistoryEntry {
   date: string;
@@ -39,13 +40,13 @@ export function RecentHistory({ data }: RecentHistoryProps) {
             <TableCell>{entry.site}</TableCell>
             <TableCell>{entry.worker}</TableCell>
             <TableCell className="text-right font-mono text-xs">
-              ${entry.startAmount.toFixed(2)}
+              {formatMoney(entry.startAmount)}
             </TableCell>
             <TableCell className="text-right font-mono text-xs">
-              ${entry.endAmount.toFixed(2)}
+              {formatMoney(entry.endAmount)}
             </TableCell>
             <TableCell className="text-right font-mono text-xs font-bold text-primary">
-              ${(entry.endAmount - entry.startAmount).toFixed(2)}
+              {formatMoney(entry.endAmount - entry.startAmount)}
             </TableCell>
           </TableRow>
         ))}

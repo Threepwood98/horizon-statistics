@@ -32,7 +32,7 @@ export function StatCard({
         </CardTitle>
       </CardHeader>
       <CardContent className="flex flex-1 items-end">
-        <div className="text-xl font-bold">{value}</div>
+        <div className="text-xl font-bold font-mono">{value}</div>
       </CardContent>
       <CardFooter className="justify-end">
         {sub && <p className="mt-1 text-xs text-muted-foreground">{sub}</p>}

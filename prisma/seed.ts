@@ -69,7 +69,7 @@ async function main() {
       const website = websites[Math.floor(Math.random() * websites.length)];
 
       const startAmount = 100 + Math.random() * 400;
-      const change = -20 + Math.random() * 80; // -20 to +60
+      const change = 5 + Math.random() * 80; // +5 to +85, always positive
       const endAmount = startAmount + change;
 
       reports.push({
