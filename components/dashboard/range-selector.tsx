@@ -2,9 +2,19 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
+import { ChevronDownIcon } from "lucide-react";
+import { type DateRange } from "react-day-picker";
+
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 export type RangeKey = "week" | "month" | "custom";
 
@@ -14,22 +24,41 @@ interface RangeSelectorProps {
   to?: string;
 }
 
-function todayISO() {
-  const now = new Date();
-  const offset = now.getTimezoneOffset() * 60000;
-  return new Date(now.getTime() - offset).toISOString().split("T")[0];
+function keyFromDate(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function dateFromKey(key: string | undefined): Date | undefined {
+  if (!key) return undefined;
+  const [y, m, d] = key.split("-").map(Number);
+  if (!y || !m || !d) return undefined;
+  return new Date(y, m - 1, d);
+}
+
+function rangeFromKeys(from?: string, to?: string): DateRange | undefined {
+  const fromDate = dateFromKey(from);
+  const toDate = dateFromKey(to);
+  if (fromDate && toDate) return { from: fromDate, to: toDate };
+  return undefined;
+}
+
+function formatLabel(date: Date): string {
+  return format(date, "d MMM.", { locale: es });
 }
 
 export function RangeSelector({ range, from, to }: RangeSelectorProps) {
   const router = useRouter();
   const [active, setActive] = React.useState<RangeKey>(range);
-  const [fromValue, setFromValue] = React.useState(from ?? "");
-  const [toValue, setToValue] = React.useState(to ?? "");
+  const [dateRange, setDateRange] = React.useState<DateRange | undefined>(
+    rangeFromKeys(from, to),
+  );
 
   React.useEffect(() => {
     setActive(range);
-    setFromValue(from ?? "");
-    setToValue(to ?? "");
+    setDateRange(rangeFromKeys(from, to));
   }, [range, from, to]);
 
   const route = (nextRange: RangeKey, nextFrom?: string, nextTo?: string) => {
@@ -42,12 +71,7 @@ export function RangeSelector({ range, from, to }: RangeSelectorProps) {
     router.replace(`?${params.toString()}`);
   };
 
-  const canApply = Boolean(
-    fromValue &&
-      toValue &&
-      fromValue <= toValue &&
-      fromValue <= todayISO(),
-  );
+  const hasSelection = Boolean(dateRange?.from && dateRange?.to);
 
   const handleChange = (values: string[]) => {
     const selection = values.at(-1) as RangeKey | undefined;
@@ -58,6 +82,11 @@ export function RangeSelector({ range, from, to }: RangeSelectorProps) {
     }
     setActive(selection);
     route(selection);
+  };
+
+  const apply = () => {
+    if (!dateRange?.from || !dateRange?.to) return;
+    route("custom", keyFromDate(dateRange.from), keyFromDate(dateRange.to));
   };
 
   return (
@@ -74,43 +103,41 @@ export function RangeSelector({ range, from, to }: RangeSelectorProps) {
       </ToggleGroup>
 
       {active === "custom" && (
-        <div className="flex flex-wrap items-end gap-2">
-          <div className="flex flex-col gap-1">
-            <label htmlFor="range-from" className="text-xs text-muted-foreground">
-              Desde
-            </label>
-            <Input
-              id="range-from"
-              type="date"
-              max={toValue || todayISO()}
-              value={fromValue}
-              onChange={(e) => setFromValue(e.target.value)}
-              className="h-8 w-36"
+        <Popover>
+          <PopoverTrigger
+            render={
+              <Button
+                variant="outline"
+                data-empty={!dateRange || !hasSelection}
+                className="w-[240px] justify-between font-normal text-left data-[empty=true]:text-muted-foreground"
+              >
+                {dateRange?.from && dateRange?.to ? (
+                  `${formatLabel(dateRange.from)} – ${formatLabel(dateRange.to)}`
+                ) : (
+                  <span>Seleccionar rango</span>
+                )}
+                <ChevronDownIcon data-icon="inline-end" />
+              </Button>
+            }
+          />
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar
+              mode="range"
+              selected={dateRange}
+              onSelect={setDateRange}
+              defaultMonth={dateRange?.from}
+              numberOfMonths={2}
+              disabled={{ after: new Date() }}
+              locale={es}
             />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label htmlFor="range-to" className="text-xs text-muted-foreground">
-              Hasta
-            </label>
-            <Input
-              id="range-to"
-              type="date"
-              min={fromValue || undefined}
-              max={todayISO()}
-              value={toValue}
-              onChange={(e) => setToValue(e.target.value)}
-              className="h-8 w-36"
-            />
-          </div>
-          <Button
-            type="button"
-            size="sm"
-            disabled={!canApply}
-            onClick={() => route("custom", fromValue, toValue)}
-          >
-            Aplicar
-          </Button>
-        </div>
+          </PopoverContent>
+        </Popover>
+      )}
+
+      {active === "custom" && (
+        <Button type="button" size="sm" disabled={!hasSelection} onClick={apply}>
+          Aplicar
+        </Button>
       )}
     </div>
   );

@@ -1,7 +1,14 @@
-"use client"
+"use client";
 
-import { TrendingUp } from "lucide-react"
-import { Bar, BarChart, CartesianGrid, LabelList, XAxis, YAxis } from "recharts"
+import { TrendingUp } from "lucide-react";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  LabelList,
+  XAxis,
+  YAxis,
+} from "recharts";
 
 import {
   Card,
@@ -10,25 +17,25 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
+} from "@/components/ui/card";
 import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
   type ChartConfig,
-} from "@/components/ui/chart"
-import { cn } from "@/lib/utils"
-import { formatMoney } from "@/lib/format"
+} from "@/components/ui/chart";
+import { cn } from "@/lib/utils";
+import { formatMoney } from "@/lib/format";
 
 interface SiteData {
-  name: string
-  total: number
+  name: string;
+  total: number;
 }
 
 interface SiteBreakdownProps {
-  data: SiteData[]
-  rangeLabel: string
-  className?: string
+  data: SiteData[];
+  rangeLabel: string;
+  className?: string;
 }
 
 const chartConfig = {
@@ -39,14 +46,18 @@ const chartConfig = {
   label: {
     color: "var(--background)",
   },
-} satisfies ChartConfig
+} satisfies ChartConfig;
 
-export function SiteBreakdown({ data, rangeLabel, className }: SiteBreakdownProps) {
-  const total = data.reduce((acc, site) => acc + site.total, 0)
+export function SiteBreakdown({
+  data,
+  rangeLabel,
+  className,
+}: SiteBreakdownProps) {
+  const total = data.reduce((acc, site) => acc + site.total, 0);
   const bestSite = data.reduce<SiteData | null>(
     (best, site) => (best === null || site.total > best.total ? site : best),
-    null
-  )
+    null,
+  );
 
   return (
     <Card className={cn(className)}>
@@ -109,14 +120,11 @@ export function SiteBreakdown({ data, rangeLabel, className }: SiteBreakdownProp
           {bestSite && (
             <>
               Mejor sitio: {bestSite.name}
-              <TrendingUp className="h-4 w-4" />
+              <TrendingUp className="size-4" />
             </>
           )}
         </div>
-        <div className="leading-none text-muted-foreground">
-          Ganancia total: {formatMoney(total)} · {rangeLabel}
-        </div>
       </CardFooter>
     </Card>
-  )
+  );
 }

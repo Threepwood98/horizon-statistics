@@ -82,10 +82,7 @@ export function DailyChart({ data, rangeLabel }: DailyChartProps) {
       <CardFooter className="flex-col items-end gap-2 text-sm">
         <div className="flex gap-2 leading-none font-medium">
           Mejor día: {bestDay.day}
-          <TrendingUp className="h-4 w-4" />
-        </div>
-        <div className="leading-none text-muted-foreground">
-          Ganancia: {formatMoney(bestDay.total)} · {rangeLabel}
+          <TrendingUp className="size-4" />
         </div>
       </CardFooter>
     </Card>
