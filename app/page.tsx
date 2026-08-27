@@ -1,69 +1,169 @@
-import Image from "next/image";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { auth } from "@/lib/auth";
+import prisma from "@/lib/prisma";
+import { StatCard } from "@/components/dashboard/stat-card";
+import { DailyChart } from "@/components/dashboard/daily-chart";
+import { SiteBreakdown } from "@/components/dashboard/site-breakdown";
+import { RecentHistory } from "@/components/dashboard/recent-history";
+import { DashboardHeader } from "@/components/dashboard/dashboard-header";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  TrendingUpIcon,
+  TrophyIcon,
+  FlameIcon,
+  CalendarCheckIcon,
+} from "lucide-react";
 
-export default function Home() {
+export default async function DashboardPage() {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session) redirect("/login");
+
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const thirtyDaysAgo = new Date(now);
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+  const [reports, userCount] = await Promise.all([
+    prisma.dailyReport.findMany({
+      where: { date: { gte: thirtyDaysAgo } },
+      include: { website: true, worker: true },
+      orderBy: { date: "desc" },
+    }),
+    prisma.user.count(),
+  ]);
+
+  // Daily aggregation (last 30 days)
+  const dailyMap = new Map<string, number>();
+  for (const r of reports) {
+    const key = r.date.toISOString().split("T")[0];
+    const gain = Number(r.endAmount) - Number(r.startAmount);
+    dailyMap.set(key, (dailyMap.get(key) || 0) + gain);
+  }
+  const dailyData = Array.from(dailyMap.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([day, total]) => ({
+      day: day.slice(5),
+      total: Math.round(total * 100) / 100,
+    }));
+
+  // Stats
+  const totalMonth = dailyData.reduce((s, d) => s + d.total, 0);
+  const avgMonth = dailyData.length > 0 ? totalMonth / dailyData.length : 0;
+  const bestDay = dailyData.reduce(
+    (a, b) => (b.total > a.total ? b : a),
+    dailyData[0] || { day: "-", total: 0 },
+  );
+
+  // Today
+  const todayStr = now.toISOString().split("T")[0];
+  const todayReports = reports.filter(
+    (r) => r.date.toISOString().split("T")[0] === todayStr,
+  );
+  const todayTotal = todayReports.reduce(
+    (s, r) => s + (Number(r.endAmount) - Number(r.startAmount)),
+    0,
+  );
+
+  // Streak
+  let streak = 0;
+  const daySet = new Set(dailyData.map((d) => d.day));
+  const today = new Date(now);
+  for (let i = 0; i < 30; i++) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const key = d.toISOString().split("T")[0].slice(5);
+    if (daySet.has(key)) streak++;
+    else break;
+  }
+
+  // By site
+  const siteMap = new Map<string, number>();
+  for (const r of reports) {
+    const name = r.website?.name || "Sin sitio";
+    const gain = Number(r.endAmount) - Number(r.startAmount);
+    siteMap.set(name, (siteMap.get(name) || 0) + gain);
+  }
+  const bySite = Array.from(siteMap.entries())
+    .map(([name, total]) => ({ name, total: Math.round(total * 100) / 100 }))
+    .sort((a, b) => b.total - a.total);
+
+  // Recent history (last 10)
+  const recent = reports.slice(0, 10).map((r) => ({
+    date: r.date.toLocaleDateString("es-ES", {
+      day: "numeric",
+      month: "short",
+    }),
+    site: r.website?.name || "-",
+    worker: r.worker?.name || "-",
+    startAmount: Number(r.startAmount),
+    endAmount: Number(r.endAmount),
+  }));
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <div className="flex min-h-svh flex-col bg-background p-6 md:p-10">
+      <DashboardHeader
+        userName={session.user.displayUsername || session.user.name}
+        teamName="Equipo Alpha"
+      />
+
+      <div className="mt-6 grid gap-4 grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          icon={TrendingUpIcon}
+          label="Ganancia mensual"
+          value={`$ ${totalMonth.toFixed(2)}`}
+          sub={`Promedio $ ${avgMonth.toFixed(2)}/día`}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+        <StatCard
+          icon={TrophyIcon}
+          label="Mejor día"
+          value={`$ ${bestDay.total.toFixed(2)}`}
+          sub={`Día ${bestDay.day}`}
+        />
+        <StatCard
+          icon={FlameIcon}
+          label="Racha"
+          value={`${streak} días`}
+          sub="Reportando seguido"
+        />
+        <StatCard
+          icon={CalendarCheckIcon}
+          label="Hoy"
+          value={`$ ${todayTotal.toFixed(2)}`}
+          sub={`${todayReports.length} reportes enviados`}
+        />
+      </div>
+
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle className="text-base">
+            Ganancia diaria · últimos 30 días
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <DailyChart data={dailyData} average={avgMonth} />
+        </CardContent>
+      </Card>
+
+      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Ganancia por sitio</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <SiteBreakdown data={bySite} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Historial reciente</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <RecentHistory data={recent} />
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
