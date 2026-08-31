@@ -1,4 +1,7 @@
+import Link from "next/link";
+import { PlusIcon } from "lucide-react";
 import { LogoutButton } from "@/components/logout-button";
+import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 
 interface DashboardHeaderProps {
@@ -16,6 +19,12 @@ export function DashboardHeader({ userName, teamName }: DashboardHeaderProps) {
         </p>
       </div>
       <div className="flex items-center gap-3 mt-3 sm:mt-0">
+        <Link href="/reportes">
+          <Button size="sm">
+            <PlusIcon />
+            Nuevo reporte
+          </Button>
+        </Link>
         <LogoutButton />
       </div>
     </div>

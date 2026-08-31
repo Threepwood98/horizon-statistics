@@ -116,14 +116,12 @@ export function SiteBreakdown({
         </ChartContainer>
       </CardContent>
       <CardFooter className="flex-col items-end gap-2 text-sm">
-        <div className="flex gap-2 leading-none font-medium">
-          {bestSite && (
-            <>
-              Mejor sitio: {bestSite.name}
-              <TrendingUp className="size-4" />
-            </>
-          )}
-        </div>
+        {bestSite && (
+          <div className="flex gap-2 leading-none font-medium">
+            Mejor sitio: {bestSite.name}
+            <TrendingUp className="size-4" />
+          </div>
+        )}
       </CardFooter>
     </Card>
   );

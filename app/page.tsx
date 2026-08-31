@@ -9,12 +9,7 @@ import { SiteBreakdown } from "@/components/dashboard/site-breakdown";
 import { RecentHistory } from "@/components/dashboard/recent-history";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 import { RangeSelector } from "@/components/dashboard/range-selector";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   DollarSignIcon,
   TrophyIcon,
@@ -36,20 +31,29 @@ export default async function DashboardPage({
   const todayKey = toKey(now);
   const todayStart = new Date(`${todayKey}T00:00:00Z`);
 
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    include: { team: true },
+  });
+
   const [rangeReports, statsHistory, todayReports, recentReports] =
     await Promise.all([
       prisma.dailyReport.findMany({
-        where: { date: where },
-        include: { website: true, worker: true },
+        where: { date: where, submittedAt: { not: null } },
+        include: { website: true, user: true },
         orderBy: { date: "desc" },
       }),
       prisma.dailyReport.groupBy({
         by: ["date"],
+        where: { submittedAt: { not: null } },
         _sum: { startAmount: true, endAmount: true },
       }),
-      prisma.dailyReport.findMany({ where: { date: todayStart } }),
       prisma.dailyReport.findMany({
-        include: { website: true, worker: true },
+        where: { date: todayStart, submittedAt: { not: null } },
+      }),
+      prisma.dailyReport.findMany({
+        where: { submittedAt: { not: null } },
+        include: { website: true, user: true },
         orderBy: { date: "desc" },
         take: 10,
       }),
@@ -124,7 +128,7 @@ export default async function DashboardPage({
   const recent = recentReports.map((r) => ({
     date: formatDateLabelUTC(toKey(r.date)),
     site: r.website?.name || "-",
-    worker: r.worker?.name || "-",
+    worker: r.user?.name || "-",
     startAmount: Number(r.startAmount),
     endAmount: Number(r.endAmount),
   }));
@@ -132,8 +136,8 @@ export default async function DashboardPage({
   return (
     <div className="flex min-h-svh flex-col bg-background p-6 md:p-10">
       <DashboardHeader
-        userName={session.user.displayUsername || session.user.name}
-        teamName="Equipo Alpha"
+        userName={user?.displayUsername || user?.name || session.user.name}
+        teamName={user?.team?.name ?? ""}
       />
 
       <div className="mt-6 grid gap-4 grid-cols-2 lg:grid-cols-4">
@@ -147,7 +151,7 @@ export default async function DashboardPage({
           icon={TrophyIcon}
           label="Mejor día"
           value={`$${bestDay.total.toFixed(2)}`}
-          sub={`Día ${bestDay.day}`}
+          sub={`${bestDay.day}`}
         />
         <StatCard
           icon={FlameIcon}

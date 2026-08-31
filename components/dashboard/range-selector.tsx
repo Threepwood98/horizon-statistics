@@ -4,7 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { ChevronDownIcon } from "lucide-react";
+import { CalendarRangeIcon, ChevronDownIcon } from "lucide-react";
 import { type DateRange } from "react-day-picker";
 
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -90,16 +90,21 @@ export function RangeSelector({ range, from, to }: RangeSelectorProps) {
   };
 
   return (
-    <div className="flex flex-wrap items-end gap-3">
+    <div className="flex flex-wrap items-end gap-2">
       <ToggleGroup
         value={[active]}
         onValueChange={handleChange}
         variant="outline"
-        size="sm"
       >
-        <ToggleGroupItem value="week">Semana</ToggleGroupItem>
-        <ToggleGroupItem value="month">Mes</ToggleGroupItem>
-        <ToggleGroupItem value="custom">Personalizado</ToggleGroupItem>
+        <ToggleGroupItem className="w-20" value="week">
+          Semana
+        </ToggleGroupItem>
+        <ToggleGroupItem className="w-20" value="month">
+          Mes
+        </ToggleGroupItem>
+        <ToggleGroupItem className="w-20" value="custom">
+          <CalendarRangeIcon />
+        </ToggleGroupItem>
       </ToggleGroup>
 
       {active === "custom" && (
@@ -109,7 +114,7 @@ export function RangeSelector({ range, from, to }: RangeSelectorProps) {
               <Button
                 variant="outline"
                 data-empty={!dateRange || !hasSelection}
-                className="w-[240px] justify-between font-normal text-left data-[empty=true]:text-muted-foreground"
+                className="justify-between font-normal text-left data-[empty=true]:text-muted-foreground"
               >
                 {dateRange?.from && dateRange?.to ? (
                   `${formatLabel(dateRange.from)} – ${formatLabel(dateRange.to)}`
@@ -133,9 +138,13 @@ export function RangeSelector({ range, from, to }: RangeSelectorProps) {
           </PopoverContent>
         </Popover>
       )}
-
       {active === "custom" && (
-        <Button type="button" size="sm" disabled={!hasSelection} onClick={apply}>
+        <Button
+          className="w-20"
+          type="button"
+          disabled={!hasSelection}
+          onClick={apply}
+        >
           Aplicar
         </Button>
       )}
