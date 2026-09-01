@@ -11,23 +11,34 @@ function generateId(): string {
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
 
-const TEAMS = [
-  { name: "Equipo Alpha", leader: "Cristopher Diaz" },
-  { name: "Equipo Beta", leader: "Maria Garcia" },
-];
+const TEAMS = [{ name: "Equipo Alpha" }, { name: "Equipo Beta" }];
 
-const USERS = [
-  // admin
-  { name: "Carlos Admin", username: "admin", role: "admin", team: 0, email: "admin@horizon.local" },
-  // managers
-  { name: "Cristopher Diaz", username: "cdiaz", role: "manager", team: 0, email: "cristopher@horizon.local" },
-  { name: "Maria Garcia", username: "mgarcia", role: "manager", team: 1, email: "maria@horizon.local" },
-  // users (equipo Alpha)
+type UserSeed = {
+  name: string;
+  username: string;
+  role: "admin" | "manager" | "leader" | "user";
+  team: number | null;
+  email: string;
+};
+
+const USERS: UserSeed[] = [
+  // globales (sin equipo): 1 admin, 1 manager
+  { name: "Carlos Admin", username: "admin", role: "admin", team: null, email: "admin@horizon.local" },
+  { name: "Sofia Manager", username: "smanager", role: "manager", team: null, email: "manager@horizon.local" },
+  // Equipo Alpha: 1 leader + 5 users
+  { name: "Cristopher Diaz", username: "cdiaz", role: "leader", team: 0, email: "cdiaz@horizon.local" },
   { name: "Ana Lopez", username: "alopez", role: "user", team: 0, email: "ana@horizon.local" },
   { name: "Carlos Ruiz", username: "cruiz", role: "user", team: 0, email: "cruiz@horizon.local" },
-  // users (equipo Beta)
+  { name: "Elena Vega", username: "evega", role: "user", team: 0, email: "elena@horizon.local" },
+  { name: "Jorge Ferrer", username: "jferrer", role: "user", team: 0, email: "jorge@horizon.local" },
+  { name: "Marta Ibañez", username: "mibanez", role: "user", team: 0, email: "marta@horizon.local" },
+  // Equipo Beta: 1 leader + 5 users
+  { name: "Maria Garcia", username: "mgarcia", role: "leader", team: 1, email: "mgarcia@horizon.local" },
   { name: "Pedro Sanchez", username: "psanchez", role: "user", team: 1, email: "pedro@horizon.local" },
   { name: "Laura Martinez", username: "lmartinez", role: "user", team: 1, email: "laura@horizon.local" },
+  { name: "Hugo Romero", username: "hromero", role: "user", team: 1, email: "hugo@horizon.local" },
+  { name: "Nora Campos", username: "ncampos", role: "user", team: 1, email: "nora@horizon.local" },
+  { name: "Ivan Rojas", username: "irojas", role: "user", team: 1, email: "ivan@horizon.local" },
 ];
 
 const WEBSITES = ["TrendKick", "PixelBay", "NovaShop", "QuickCart"];
@@ -45,7 +56,7 @@ async function main() {
   await prisma.team.deleteMany();
 
   const teams = await Promise.all(
-    TEAMS.map((t) => prisma.team.create({ data: t })),
+    TEAMS.map((t) => prisma.team.create({ data: { ...t, leader: "" } })),
   );
 
   const password = "Password123!";
@@ -62,7 +73,7 @@ async function main() {
         role: u.role,
         username: u.username,
         displayUsername: u.username,
-        teamId: teams[u.team].id,
+        teamId: u.team === null ? undefined : teams[u.team].id,
       },
     });
     await prisma.account.create({
@@ -78,51 +89,76 @@ async function main() {
     users.push(created);
   }
 
-  const admin = users[0];
-  await prisma.user.update({
-    where: { id: admin.id },
-    data: { role: "admin" },
-  });
+  // Asignar el leader de cada equipo (role leader) al campo Team.leader
+  for (const u of USERS) {
+    if (u.role === "leader" && u.team !== null) {
+      const leaderUser = users.find((x) => x.username === u.username);
+      await prisma.team.update({
+        where: { id: teams[u.team!].id },
+        data: { leader: leaderUser!.name },
+      });
+    }
+  }
 
   const websites = await Promise.all(
     WEBSITES.map((w) => prisma.website.create({ data: { name: w } })),
   );
 
   const userWorkers = users.filter((u) => u.role === "user");
+  const userById = new Map(users.map((u) => [u.id, u]));
 
   const now = new Date();
+  const nowKey = now.toISOString().slice(0, 10);
   const reports = [];
 
   for (let i = 29; i >= 0; i--) {
     const date = new Date(now);
     date.setDate(date.getDate() - i);
     date.setHours(0, 0, 0, 0);
+    const dateKey = date.toISOString().slice(0, 10);
+    const isToday = dateKey === nowKey;
 
-    const reportsPerDay = 2 + Math.floor(Math.random() * 3);
+    for (const worker of userWorkers) {
+      const reportsForDay = 1 + Math.floor(Math.random() * 2);
 
-    for (let j = 0; j < reportsPerDay; j++) {
-      const user = userWorkers[Math.floor(Math.random() * userWorkers.length)];
-      const website = websites[Math.floor(Math.random() * websites.length)];
+      for (let j = 0; j < reportsForDay; j++) {
+        const website = websites[Math.floor(Math.random() * websites.length)];
+        const startAmount = 100 + Math.random() * 400;
+        const change = 5 + Math.random() * 80;
+        const endAmount = startAmount + change;
 
-      const startAmount = 100 + Math.random() * 400;
-      const change = 5 + Math.random() * 80;
-      const endAmount = startAmount + change;
+        let status: "accepted" | "sent" | "draft";
+        if (isToday) {
+          // hoy: pendientes de aprobación o borradores
+          status = Math.random() < 0.4 ? "sent" : "draft";
+        } else {
+          const roll = Math.random();
+          status = roll < 0.75 ? "accepted" : roll < 0.9 ? "sent" : "draft";
+        }
 
-      reports.push({
-        userId: user.id,
-        websiteId: website.id,
-        date,
-        startAmount: Math.round(startAmount * 100) / 100,
-        endAmount: Math.round(endAmount * 100) / 100,
-      });
+        reports.push({
+          userId: worker.id,
+          websiteId: website.id,
+          date,
+          startAmount: Math.round(startAmount * 100) / 100,
+          endAmount: Math.round(endAmount * 100) / 100,
+          status,
+          sentAt: status === "draft" ? null : new Date(date.getTime() + 1000 * 60 * 60 * 12),
+          acceptedAt:
+            status === "accepted"
+              ? new Date(date.getTime() + 1000 * 60 * 60 * 13)
+              : null,
+        });
+      }
     }
   }
 
   await prisma.dailyReport.createMany({ data: reports });
 
-  const userById = new Map(users.map((u) => [u.id, u]));
+  // Balance = suma de ganancias de reportes ACEPTADOS por equipo+sitio
   const balanceMap = new Map<string, number>();
   for (const r of reports) {
+    if (r.status !== "accepted") continue;
     const teamId = userById.get(r.userId)?.teamId;
     if (teamId === undefined || teamId === null) continue;
     const key = `${teamId}:${r.websiteId}`;
@@ -141,11 +177,19 @@ async function main() {
   }
   await prisma.balance.createMany({ data: balances });
 
+  const countByStatus = reports.reduce(
+    (acc, r) => {
+      acc[r.status] = (acc[r.status] || 0) + 1;
+      return acc;
+    },
+    {} as Record<string, number>,
+  );
+
   console.log(`Created:
   - ${teams.length} teams
-  - ${users.length} users (1 admin, ${users.filter((u) => u.role === "manager").length} managers, ${userWorkers.length} users)
+  - ${users.length} users (${users.filter((u) => u.role === "admin").length} admin, ${users.filter((u) => u.role === "manager").length} manager, ${users.filter((u) => u.role === "leader").length} leader, ${userWorkers.length} users)
   - ${websites.length} websites
-  - ${reports.length} daily reports
+  - ${reports.length} daily reports (${JSON.stringify(countByStatus)})
   - ${balances.length} balances
   Common password for all accounts: ${password}`);
 }

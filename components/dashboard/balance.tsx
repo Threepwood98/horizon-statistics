@@ -14,52 +14,63 @@ import { cn } from "@/lib/utils";
 
 interface BalanceRow {
   site: string;
-  balance: number;
+  historic: number;
+  live: number;
 }
 
 interface BalanceProps {
-  accounts: BalanceRow[];
+  balances: BalanceRow[];
   teamName: string;
   className?: string;
 }
 
-export function Balance({ accounts, teamName, className }: BalanceProps) {
-  const total = accounts.reduce((s, a) => s + a.balance, 0);
+export function Balance({ balances, teamName, className }: BalanceProps) {
+  const totalHistoric = balances.reduce((s, a) => s + a.historic, 0);
+  const totalLive = balances.reduce((s, a) => s + a.live, 0);
 
   return (
     <Card className={cn(className)}>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <WalletIcon />
-          Saldos de {teamName}
+          Balances de {teamName}
         </CardTitle>
       </CardHeader>
       <CardContent>
-        {accounts.length === 0 ? (
+        {balances.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No hay saldos registrados para este equipo.
+            No hay balances registrados para este equipo.
           </p>
         ) : (
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Sitio</TableHead>
-                <TableHead className="text-right">Saldo</TableHead>
+                <TableHead className="text-right">Saldo (aprobado)</TableHead>
+                <TableHead className="text-right">En vivo hoy</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {accounts.map((a) => (
+              {balances.map((a) => (
                 <TableRow key={a.site}>
                   <TableCell className="font-medium">{a.site}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {formatMoney(a.historic)}
+                  </TableCell>
                   <TableCell className="text-right tabular-nums font-medium">
-                    {formatMoney(a.balance)}
+                    {Math.abs(a.live - a.historic) < 0.000001
+                      ? formatMoney(a.live)
+                      : formatMoney(a.live)}
                   </TableCell>
                 </TableRow>
               ))}
               <TableRow>
                 <TableCell className="font-medium">Total</TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {formatMoney(totalHistoric)}
+                </TableCell>
                 <TableCell className="text-right tabular-nums font-semibold">
-                  {formatMoney(total)}
+                  {formatMoney(totalLive)}
                 </TableCell>
               </TableRow>
             </TableBody>

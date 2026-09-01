@@ -22,6 +22,10 @@ async function requireAuthedUser() {
   return { userId: session.user.id, user };
 }
 
+function isManagerOrAdmin(role: string): boolean {
+  return role === "manager" || role === "admin";
+}
+
 export async function addReport(input: {
   date: string;
   websiteId: number;
@@ -49,14 +53,20 @@ export async function addReport(input: {
   const website = await prisma.website.findUnique({ where: { id: websiteId } });
   if (!website) return { error: "Sitio no encontrado" };
 
-  const existingSubmitted = await prisma.dailyReport.findFirst({
-    where: { userId, websiteId, date, submittedAt: { not: null } },
+  const existingSent = await prisma.dailyReport.findFirst({
+    where: { userId, websiteId, date, status: "sent" },
   });
-  if (existingSubmitted)
-    return { error: "Ya enviaste el parte de este sitio para ese día" };
+  if (existingSent)
+    return { error: "Ya enviaste este sitio para ese día. Esperá la respuesta del manager." };
+
+  const existingAccepted = await prisma.dailyReport.findFirst({
+    where: { userId, websiteId, date, status: "accepted" },
+  });
+  if (existingAccepted)
+    return { error: "Ya se aceptó el parte de este sitio para ese día" };
 
   const draft = await prisma.dailyReport.findFirst({
-    where: { userId, websiteId, date, submittedAt: null },
+    where: { userId, websiteId, date, status: "draft" },
   });
 
   if (draft) {
@@ -75,7 +85,7 @@ export async function addReport(input: {
         date,
         startAmount,
         endAmount,
-        submittedAt: null,
+        status: "draft",
       },
     });
   }
@@ -87,7 +97,7 @@ export async function addReport(input: {
 export async function deleteDraft(id: number): Promise<ActionResult> {
   const { userId } = await requireAuthedUser();
   const report = await prisma.dailyReport.findUnique({ where: { id } });
-  if (!report || report.userId !== userId || report.submittedAt !== null)
+  if (!report || report.userId !== userId || report.status !== "draft")
     return { error: "No podés eliminar ese reporte" };
   await prisma.dailyReport.delete({ where: { id } });
   revalidatePath("/reportes");
@@ -97,48 +107,102 @@ export async function deleteDraft(id: number): Promise<ActionResult> {
 export async function sendPart(date: string): Promise<ActionResult> {
   const { userId, user } = await requireAuthedUser();
 
+  if (user.teamId === null)
+    return { error: "No pertenecés a un equipo, no podés enviar el parte" };
+
   const reports = await prisma.dailyReport.findMany({
-    where: { userId, date: toDateKey(date), submittedAt: null },
+    where: { userId, date: toDateKey(date), status: "draft" },
   });
   if (reports.length === 0)
     return { error: "No hay borradores para enviar ese día" };
 
-  const gains = new Map<string, number>();
-  for (const r of reports) {
-    if (r.websiteId === null) continue;
-    const key = String(r.websiteId);
-    gains.set(key, (gains.get(key) || 0) + (Number(r.endAmount) - Number(r.startAmount)));
-  }
-
-  await prisma.$transaction([
-    prisma.dailyReport.updateMany({
-      where: {
-        userId,
-        date: toDateKey(date),
-        submittedAt: null,
-      },
-      data: { submittedAt: new Date() },
-    }),
-    ...(user.teamId !== null
-      ? Array.from(gains.entries()).map(([websiteId, gain]) =>
-          prisma.balance.upsert({
-            where: { teamId_websiteId: { teamId: user.teamId!, websiteId: BigInt(websiteId) } },
-            create: {
-              teamId: user.teamId!,
-              websiteId: BigInt(websiteId),
-              balance: Math.round(gain * 100) / 100,
-            },
-            update: {
-              balance: {
-                increment: Math.round(gain * 100) / 100,
-              },
-            },
-          }),
-        )
-      : []),
-  ]);
+  await prisma.dailyReport.updateMany({
+    where: {
+      userId,
+      date: toDateKey(date),
+      status: "draft",
+    },
+    data: { status: "sent", sentAt: new Date() },
+  });
 
   revalidatePath("/reportes");
+  return { ok: true };
+}
+
+async function canManageReport(user: { id: string; role: string }): Promise<boolean> {
+  return isManagerOrAdmin(user.role);
+}
+
+export async function acceptReport(reportId: number): Promise<ActionResult> {
+  const { user } = await requireAuthedUser();
+
+  const report = await prisma.dailyReport.findUnique({
+    where: { id: reportId },
+    include: { user: { select: { teamId: true } } },
+  });
+  if (!report || report.status !== "sent")
+    return { error: "Ese parte no está pendiente de aprobación" };
+  if (!(await canManageReport(user)))
+    return { error: "No tenés permisos para aprobar ese parte" };
+
+  const gain = Number(report.endAmount) - Number(report.startAmount);
+  const teamId = report.user?.teamId;
+  const websiteId = report.websiteId;
+
+  if (teamId != null && websiteId != null) {
+    await prisma.$transaction([
+      prisma.dailyReport.update({
+        where: { id: report.id },
+        data: { status: "accepted", acceptedAt: new Date(), rejectionNote: null },
+      }),
+      prisma.balance.upsert({
+        where: { teamId_websiteId: { teamId, websiteId } },
+        create: {
+          teamId,
+          websiteId,
+          balance: Math.round(gain * 100) / 100,
+        },
+        update: {
+          balance: { increment: Math.round(gain * 100) / 100 },
+        },
+      }),
+    ]);
+  } else {
+    await prisma.dailyReport.update({
+      where: { id: report.id },
+      data: { status: "accepted", acceptedAt: new Date(), rejectionNote: null },
+    });
+  }
+
+  revalidatePath("/reportes");
+  revalidatePath("/aprobaciones");
   revalidatePath("/");
+  return { ok: true };
+}
+
+export async function rejectReport(
+  reportId: number,
+  note: string,
+): Promise<ActionResult> {
+  const { user } = await requireAuthedUser();
+
+  const noteText = (note || "").trim();
+  if (!noteText) return { error: "Indicá el motivo del rechazo" };
+
+  const report = await prisma.dailyReport.findUnique({
+    where: { id: reportId },
+  });
+  if (!report || report.status !== "sent")
+    return { error: "Ese parte no está pendiente de aprobación" };
+  if (!(await canManageReport(user)))
+    return { error: "No tenés permisos para rechazar ese parte" };
+
+  await prisma.dailyReport.update({
+    where: { id: report.id },
+    data: { status: "draft", sentAt: null, acceptedAt: null, rejectionNote: noteText },
+  });
+
+  revalidatePath("/reportes");
+  revalidatePath("/aprobaciones");
   return { ok: true };
 }

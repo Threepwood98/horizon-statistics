@@ -37,23 +37,23 @@ export default async function DashboardPage({
     include: { team: true },
   });
 
-  const [rangeReports, statsHistory, todayReports, recentReports, balances] =
+  const [rangeReports, statsHistory, todayReports, recentReports, balances, todayLiveReports] =
     await Promise.all([
       prisma.dailyReport.findMany({
-        where: { date: where, submittedAt: { not: null } },
+        where: { date: where, status: "accepted" },
         include: { website: true, user: true },
         orderBy: { date: "desc" },
       }),
       prisma.dailyReport.groupBy({
         by: ["date"],
-        where: { submittedAt: { not: null } },
+        where: { status: "accepted" },
         _sum: { startAmount: true, endAmount: true },
       }),
       prisma.dailyReport.findMany({
-        where: { date: todayStart, submittedAt: { not: null } },
+        where: { date: todayStart, status: "accepted" },
       }),
       prisma.dailyReport.findMany({
-        where: { submittedAt: { not: null } },
+        where: { status: "accepted" },
         include: { website: true, user: true },
         orderBy: { date: "desc" },
         take: 10,
@@ -63,6 +63,15 @@ export default async function DashboardPage({
             where: { teamId: user.teamId },
             include: { website: true },
             orderBy: { balance: "desc" },
+          })
+        : Promise.resolve([]),
+      user?.teamId != null
+        ? prisma.dailyReport.findMany({
+            where: {
+              date: todayStart,
+              status: { in: ["draft", "sent"] },
+            },
+            include: { website: true, user: true },
           })
         : Promise.resolve([]),
     ]);
@@ -141,16 +150,30 @@ export default async function DashboardPage({
     endAmount: Number(r.endAmount),
   }));
 
-  const balanceRows = balances.map((a) => ({
-    site: a.website?.name || "Sin sitio",
-    balance: Number(a.balance),
-  }));
+  const teamId = user?.teamId ?? null;
+
+  const liveGainBySite = new Map<string, number>();
+  for (const r of todayLiveReports) {
+    if (teamId == null) break;
+    if (r.user?.teamId !== teamId) continue;
+    const name = r.website?.name || "Sin sitio";
+    const gain = Number(r.endAmount) - Number(r.startAmount);
+    liveGainBySite.set(name, (liveGainBySite.get(name) || 0) + gain);
+  }
+
+  const balanceRows = balances.map((a) => {
+    const site = a.website?.name || "Sin sitio";
+    const historic = Number(a.balance);
+    const live = Math.round((historic + (liveGainBySite.get(site) || 0)) * 100) / 100;
+    return { site, historic, live };
+  });
 
   return (
     <div className="flex min-h-svh flex-col bg-background p-6 md:p-10">
       <DashboardHeader
-        userName={user?.displayUsername || user?.name || session.user.name}
+        userName={user?.name ?? ""}
         teamName={user?.team?.name ?? ""}
+        role={user?.role}
       />
 
       <div className="mt-6 grid gap-4 grid-cols-2 lg:grid-cols-4">
@@ -203,7 +226,7 @@ export default async function DashboardPage({
       {balanceRows.length > 0 && user?.team && (
         <div className="mt-6">
           <Balance
-            accounts={balanceRows}
+            balances={balanceRows}
             teamName={user.team.name}
             className="max-w-2xl"
           />

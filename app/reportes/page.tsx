@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { ArrowLeftIcon, ClipboardListIcon } from "lucide-react";
+import { ArrowLeftIcon, ClipboardListIcon, ClockIcon } from "lucide-react";
 
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
@@ -31,17 +31,22 @@ export default async function ReportesPage({
   });
   if (!user) redirect("/login");
 
-  const [websites, drafts, submitted] = await Promise.all([
+  const [websites, drafts, sentList, acceptedList] = await Promise.all([
     prisma.website.findMany({ orderBy: { name: "asc" } }),
     prisma.dailyReport.findMany({
-      where: { userId: user.id, date: dateStart, submittedAt: null },
+      where: { userId: user.id, date: dateStart, status: "draft" },
       include: { website: true },
       orderBy: { id: "asc" },
     }),
     prisma.dailyReport.findMany({
-      where: { userId: user.id, submittedAt: { not: null } },
+      where: { userId: user.id, date: dateStart, status: "sent" },
       include: { website: true },
-      orderBy: [{ date: "desc" }, { id: "desc" }],
+      orderBy: { id: "asc" },
+    }),
+    prisma.dailyReport.findMany({
+      where: { userId: user.id, date: dateStart, status: "accepted" },
+      include: { website: true },
+      orderBy: { id: "asc" },
     }),
   ]);
 
@@ -50,15 +55,22 @@ export default async function ReportesPage({
     site: r.website?.name ?? "Sin sitio",
     start: Number(r.startAmount),
     end: Number(r.endAmount),
+    rejectionNote: r.rejectionNote,
   }));
 
-  const sentRows = submitted.filter((r) => toKey(r.date) === dateKey).map(
-    (r) => ({
-      site: r.website?.name ?? "Sin sitio",
-      start: Number(r.startAmount),
-      end: Number(r.endAmount),
-    }),
-  );
+  const rejected = draftRows.filter((d) => d.rejectionNote);
+
+  const sentRows = sentList.map((r) => ({
+    site: r.website?.name ?? "Sin sitio",
+    start: Number(r.startAmount),
+    end: Number(r.endAmount),
+  }));
+
+  const acceptedRows = acceptedList.map((r) => ({
+    site: r.website?.name ?? "Sin sitio",
+    start: Number(r.startAmount),
+    end: Number(r.endAmount),
+  }));
 
   const userName = user.displayUsername || user.name;
   const teamName = user.team?.name ?? "Sin equipo";
@@ -93,6 +105,20 @@ export default async function ReportesPage({
         </div>
       </div>
 
+      {rejected.length > 0 && (
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base text-destructive">
+              <ClipboardListIcon />
+              Rechazado por el manager
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <DraftList drafts={draftRows} date={dateKey} showRejection />
+          </CardContent>
+        </Card>
+      )}
+
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
@@ -105,14 +131,32 @@ export default async function ReportesPage({
             <DraftList drafts={draftRows} date={dateKey} />
           </CardContent>
         </Card>
+
+        {sentRows.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <ClockIcon />
+                En revisión
+              </CardTitle>
+              <CardDescription>
+                Enviados al manager y pendientes de aprobación.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <SentReports reports={sentRows} date={dateKey} showHeader={false} />
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       <div className="mt-6 max-w-2xl">
         <SentReports
-          reports={sentRows}
+          reports={acceptedRows}
           workerName={userName}
           teamName={teamName}
           date={dateKey}
+          accepted
         />
       </div>
     </div>

@@ -22,14 +22,16 @@ interface DraftRow {
   site: string;
   start: number;
   end: number;
+  rejectionNote?: string | null;
 }
 
 interface DraftListProps {
   drafts: DraftRow[];
   date: string;
+  showRejection?: boolean;
 }
 
-export function DraftList({ drafts, date }: DraftListProps) {
+export function DraftList({ drafts, date, showRejection }: DraftListProps) {
   const router = useRouter();
   const [error, setError] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
@@ -92,30 +94,42 @@ export function DraftList({ drafts, date }: DraftListProps) {
         </TableHeader>
         <TableBody>
           {drafts.map((d) => (
-            <TableRow key={d.id}>
-              <TableCell className="font-medium">{d.site}</TableCell>
-              <TableCell className="text-right tabular-nums">
-                {formatMoney(d.start)}
-              </TableCell>
-              <TableCell className="text-right tabular-nums">
-                {formatMoney(d.end)}
-              </TableCell>
-              <TableCell className="text-right tabular-nums font-medium">
-                {formatMoney(d.end - d.start)}
-              </TableCell>
-              <TableCell>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={`Eliminar borrador de ${d.site}`}
-                  disabled={busy}
-                  onClick={() => remove(d.id)}
-                >
-                  <TrashIcon />
-                </Button>
-              </TableCell>
-            </TableRow>
+            <React.Fragment key={d.id}>
+              <TableRow>
+                <TableCell className="font-medium">{d.site}</TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {formatMoney(d.start)}
+                </TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {formatMoney(d.end)}
+                </TableCell>
+                <TableCell className="text-right tabular-nums font-medium">
+                  {formatMoney(d.end - d.start)}
+                </TableCell>
+                <TableCell>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={`Eliminar borrador de ${d.site}`}
+                    disabled={busy}
+                    onClick={() => remove(d.id)}
+                  >
+                    <TrashIcon />
+                  </Button>
+                </TableCell>
+              </TableRow>
+              {showRejection && d.rejectionNote && (
+                <TableRow>
+                  <TableCell
+                    colSpan={5}
+                    className="text-sm text-destructive whitespace-pre-wrap"
+                  >
+                    Motivo: {d.rejectionNote}
+                  </TableCell>
+                </TableRow>
+              )}
+            </React.Fragment>
           ))}
           <TableRow>
             <TableCell className="font-medium">Total</TableCell>
