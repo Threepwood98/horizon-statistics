@@ -1,8 +1,8 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { getRange, toKey, addDaysKey, formatDateLabelUTC } from "@/lib/range";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
-import { getRange, toKey, addDaysKey, formatDateLabelUTC } from "@/lib/range";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { DailyChart } from "@/components/dashboard/daily-chart";
 import { SiteBreakdown } from "@/components/dashboard/site-breakdown";
@@ -37,44 +37,50 @@ export default async function DashboardPage({
     include: { team: true },
   });
 
-  const [rangeReports, statsHistory, todayReports, recentReports, balances, todayLiveReports] =
-    await Promise.all([
-      prisma.dailyReport.findMany({
-        where: { date: where, status: "accepted" },
-        include: { website: true, user: true },
-        orderBy: { date: "desc" },
-      }),
-      prisma.dailyReport.groupBy({
-        by: ["date"],
-        where: { status: "accepted" },
-        _sum: { startAmount: true, endAmount: true },
-      }),
-      prisma.dailyReport.findMany({
-        where: { date: todayStart, status: "accepted" },
-      }),
-      prisma.dailyReport.findMany({
-        where: { status: "accepted" },
-        include: { website: true, user: true },
-        orderBy: { date: "desc" },
-        take: 10,
-      }),
-      user?.teamId != null
-        ? prisma.balance.findMany({
-            where: { teamId: user.teamId },
-            include: { website: true },
-            orderBy: { balance: "desc" },
-          })
-        : Promise.resolve([]),
-      user?.teamId != null
-        ? prisma.dailyReport.findMany({
-            where: {
-              date: todayStart,
-              status: { in: ["draft", "sent"] },
-            },
-            include: { website: true, user: true },
-          })
-        : Promise.resolve([]),
-    ]);
+  const [
+    rangeReports,
+    statsHistory,
+    todayReports,
+    recentReports,
+    balances,
+    todayLiveReports,
+  ] = await Promise.all([
+    prisma.dailyReport.findMany({
+      where: { date: where, status: "accepted" },
+      include: { website: true, user: true },
+      orderBy: { date: "desc" },
+    }),
+    prisma.dailyReport.groupBy({
+      by: ["date"],
+      where: { status: "accepted" },
+      _sum: { startAmount: true, endAmount: true },
+    }),
+    prisma.dailyReport.findMany({
+      where: { date: todayStart, status: "accepted" },
+    }),
+    prisma.dailyReport.findMany({
+      where: { status: "accepted" },
+      include: { website: true, user: true },
+      orderBy: { date: "desc" },
+      take: 10,
+    }),
+    user?.teamId != null
+      ? prisma.balance.findMany({
+          where: { teamId: user.teamId },
+          include: { website: true },
+          orderBy: { balance: "desc" },
+        })
+      : Promise.resolve([]),
+    user?.teamId != null
+      ? prisma.dailyReport.findMany({
+          where: {
+            date: todayStart,
+            status: { in: ["draft", "sent"] },
+          },
+          include: { website: true, user: true },
+        })
+      : Promise.resolve([]),
+  ]);
 
   // Daily aggregation (selected range)
   const dailyMap = new Map<string, number>();
@@ -164,12 +170,13 @@ export default async function DashboardPage({
   const balanceRows = balances.map((a) => {
     const site = a.website?.name || "Sin sitio";
     const historic = Number(a.balance);
-    const live = Math.round((historic + (liveGainBySite.get(site) || 0)) * 100) / 100;
+    const live =
+      Math.round((historic + (liveGainBySite.get(site) || 0)) * 100) / 100;
     return { site, historic, live };
   });
 
   return (
-    <div className="flex min-h-svh flex-col bg-background p-6 md:p-10">
+    <>
       <DashboardHeader
         userName={user?.name ?? ""}
         teamName={user?.team?.name ?? ""}
@@ -232,6 +239,6 @@ export default async function DashboardPage({
           />
         </div>
       )}
-    </div>
+    </>
   );
 }

@@ -76,7 +76,7 @@ export default async function ReportesPage({
   const teamName = user.team?.name ?? "Sin equipo";
 
   return (
-    <div className="flex min-h-svh flex-col bg-background p-6 md:p-10">
+    <div className="flex flex-col">
       <Link
         href="/"
         className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
