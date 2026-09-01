@@ -95,7 +95,7 @@ export async function deleteDraft(id: number): Promise<ActionResult> {
 }
 
 export async function sendPart(date: string): Promise<ActionResult> {
-  const { userId } = await requireAuthedUser();
+  const { userId, user } = await requireAuthedUser();
 
   const reports = await prisma.dailyReport.findMany({
     where: { userId, date: toDateKey(date), submittedAt: null },
@@ -103,14 +103,40 @@ export async function sendPart(date: string): Promise<ActionResult> {
   if (reports.length === 0)
     return { error: "No hay borradores para enviar ese día" };
 
-  await prisma.dailyReport.updateMany({
-    where: {
-      userId,
-      date: toDateKey(date),
-      submittedAt: null,
-    },
-    data: { submittedAt: new Date() },
-  });
+  const gains = new Map<string, number>();
+  for (const r of reports) {
+    if (r.websiteId === null) continue;
+    const key = String(r.websiteId);
+    gains.set(key, (gains.get(key) || 0) + (Number(r.endAmount) - Number(r.startAmount)));
+  }
+
+  await prisma.$transaction([
+    prisma.dailyReport.updateMany({
+      where: {
+        userId,
+        date: toDateKey(date),
+        submittedAt: null,
+      },
+      data: { submittedAt: new Date() },
+    }),
+    ...(user.teamId !== null
+      ? Array.from(gains.entries()).map(([websiteId, gain]) =>
+          prisma.balance.upsert({
+            where: { teamId_websiteId: { teamId: user.teamId!, websiteId: BigInt(websiteId) } },
+            create: {
+              teamId: user.teamId!,
+              websiteId: BigInt(websiteId),
+              balance: Math.round(gain * 100) / 100,
+            },
+            update: {
+              balance: {
+                increment: Math.round(gain * 100) / 100,
+              },
+            },
+          }),
+        )
+      : []),
+  ]);
 
   revalidatePath("/reportes");
   revalidatePath("/");

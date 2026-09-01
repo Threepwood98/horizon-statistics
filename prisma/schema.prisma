@@ -13,16 +13,30 @@ datasource db {
 }
 
 model Team {
-  id     BigInt @id @default(autoincrement())
-  name   String
-  leader String
-  users  User[]
+  id       BigInt    @id @default(autoincrement())
+  name     String
+  leader   String
+  users    User[]
+  balances Balance[]
 }
 
 model Website {
   id           BigInt        @id @default(autoincrement())
   name         String
   dailyReports DailyReport[]
+  balances     Balance[]
+}
+
+model Balance {
+  id        BigInt   @id @default(autoincrement())
+  teamId    BigInt
+  team      Team     @relation(fields: [teamId], references: [id])
+  websiteId BigInt
+  website   Website  @relation(fields: [websiteId], references: [id])
+  balance   Decimal  @default(0) @db.Decimal
+
+  @@unique([teamId, websiteId])
+  @@index([websiteId])
 }
 
 model DailyReport {

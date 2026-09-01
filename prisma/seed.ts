@@ -36,6 +36,7 @@ async function main() {
   console.log("Seeding database...");
 
   await prisma.dailyReport.deleteMany();
+  await prisma.balance.deleteMany();
   await prisma.session.deleteMany();
   await prisma.account.deleteMany();
   await prisma.verification.deleteMany();
@@ -119,11 +120,33 @@ async function main() {
 
   await prisma.dailyReport.createMany({ data: reports });
 
+  const userById = new Map(users.map((u) => [u.id, u]));
+  const balanceMap = new Map<string, number>();
+  for (const r of reports) {
+    const teamId = userById.get(r.userId)?.teamId;
+    if (teamId === undefined || teamId === null) continue;
+    const key = `${teamId}:${r.websiteId}`;
+    const gain = Number(r.endAmount) - Number(r.startAmount);
+    balanceMap.set(key, (balanceMap.get(key) || 0) + gain);
+  }
+
+  const balances = [];
+  for (const [key, balance] of balanceMap) {
+    const [teamId, websiteId] = key.split(":").map(BigInt);
+    balances.push({
+      teamId,
+      websiteId,
+      balance: Math.round(balance * 100) / 100,
+    });
+  }
+  await prisma.balance.createMany({ data: balances });
+
   console.log(`Created:
   - ${teams.length} teams
   - ${users.length} users (1 admin, ${users.filter((u) => u.role === "manager").length} managers, ${userWorkers.length} users)
   - ${websites.length} websites
   - ${reports.length} daily reports
+  - ${balances.length} balances
   Common password for all accounts: ${password}`);
 }
 

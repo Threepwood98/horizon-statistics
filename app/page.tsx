@@ -7,6 +7,7 @@ import { StatCard } from "@/components/dashboard/stat-card";
 import { DailyChart } from "@/components/dashboard/daily-chart";
 import { SiteBreakdown } from "@/components/dashboard/site-breakdown";
 import { RecentHistory } from "@/components/dashboard/recent-history";
+import { Balance } from "@/components/dashboard/balance";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 import { RangeSelector } from "@/components/dashboard/range-selector";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,7 +37,7 @@ export default async function DashboardPage({
     include: { team: true },
   });
 
-  const [rangeReports, statsHistory, todayReports, recentReports] =
+  const [rangeReports, statsHistory, todayReports, recentReports, balances] =
     await Promise.all([
       prisma.dailyReport.findMany({
         where: { date: where, submittedAt: { not: null } },
@@ -57,6 +58,13 @@ export default async function DashboardPage({
         orderBy: { date: "desc" },
         take: 10,
       }),
+      user?.teamId != null
+        ? prisma.balance.findMany({
+            where: { teamId: user.teamId },
+            include: { website: true },
+            orderBy: { balance: "desc" },
+          })
+        : Promise.resolve([]),
     ]);
 
   // Daily aggregation (selected range)
@@ -133,6 +141,11 @@ export default async function DashboardPage({
     endAmount: Number(r.endAmount),
   }));
 
+  const balanceRows = balances.map((a) => ({
+    site: a.website?.name || "Sin sitio",
+    balance: Number(a.balance),
+  }));
+
   return (
     <div className="flex min-h-svh flex-col bg-background p-6 md:p-10">
       <DashboardHeader
@@ -186,6 +199,16 @@ export default async function DashboardPage({
           </CardContent>
         </Card>
       </div>
+
+      {balanceRows.length > 0 && user?.team && (
+        <div className="mt-6">
+          <Balance
+            accounts={balanceRows}
+            teamName={user.team.name}
+            className="max-w-2xl"
+          />
+        </div>
+      )}
     </div>
   );
 }
