@@ -30,8 +30,7 @@ import {
 
 interface ApprovalRow {
   site: string;
-  start: number;
-  end: number;
+  amount: number;
 }
 
 interface ApprovalGroup {
@@ -102,9 +101,7 @@ export function ApprovalList({ groups, canManage }: ApprovalListProps) {
       {error && <p className="text-sm text-destructive">{error}</p>}
 
       {groups.map((group) => {
-        const totalStart = group.rows.reduce((s, r) => s + r.start, 0);
-        const totalEnd = group.rows.reduce((s, r) => s + r.end, 0);
-        const totalGain = totalEnd - totalStart;
+        const totalAmount = group.rows.reduce((s, r) => s + r.amount, 0);
 
         return (
           <div
@@ -146,36 +143,22 @@ export function ApprovalList({ groups, canManage }: ApprovalListProps) {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Sitio</TableHead>
-                    <TableHead className="text-right">Inicio</TableHead>
-                    <TableHead className="text-right">Final</TableHead>
-                    <TableHead className="text-right">Ganancia</TableHead>
+                    <TableHead className="text-right">Monto</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {group.rows.map((r) => (
                     <TableRow key={r.site}>
                       <TableCell className="font-medium">{r.site}</TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {formatMoney(r.start)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {formatMoney(r.end)}
-                      </TableCell>
                       <TableCell className="text-right tabular-nums font-medium">
-                        {formatMoney(r.end - r.start)}
+                        {formatMoney(r.amount)}
                       </TableCell>
                     </TableRow>
                   ))}
                   <TableRow>
                     <TableCell className="font-medium">Total</TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatMoney(totalStart)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatMoney(totalEnd)}
-                    </TableCell>
                     <TableCell className="text-right tabular-nums font-semibold">
-                      {formatMoney(totalGain)}
+                      {formatMoney(totalAmount)}
                     </TableCell>
                   </TableRow>
                 </TableBody>

@@ -20,8 +20,7 @@ import {
 interface DraftRow {
   id: number;
   site: string;
-  start: number;
-  end: number;
+  amount: number;
   rejectionNote?: string | null;
 }
 
@@ -29,9 +28,15 @@ interface DraftListProps {
   drafts: DraftRow[];
   date: string;
   showRejection?: boolean;
+  hideSend?: boolean;
 }
 
-export function DraftList({ drafts, date, showRejection }: DraftListProps) {
+export function DraftList({
+  drafts,
+  date,
+  showRejection,
+  hideSend,
+}: DraftListProps) {
   const router = useRouter();
   const [error, setError] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
@@ -65,15 +70,13 @@ export function DraftList({ drafts, date, showRejection }: DraftListProps) {
     });
   };
 
-  const totalStart = drafts.reduce((s, d) => s + d.start, 0);
-  const totalEnd = drafts.reduce((s, d) => s + d.end, 0);
-  const totalGain = totalEnd - totalStart;
+  const totalAmount = drafts.reduce((s, d) => s + d.amount, 0);
 
   if (drafts.length === 0) {
     return (
       <div className="flex flex-col gap-3">
         <p className="text-sm text-muted-foreground">
-          No hay borradores para este día.
+          No hay reportes para este día.
         </p>
         {error && <p className="text-sm text-destructive">{error}</p>}
       </div>
@@ -85,11 +88,9 @@ export function DraftList({ drafts, date, showRejection }: DraftListProps) {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Sitio</TableHead>
-            <TableHead className="text-right">Inicio</TableHead>
-            <TableHead className="text-right">Final</TableHead>
-            <TableHead className="text-right">Ganancia</TableHead>
-            <TableHead className="w-10" />
+            <TableHead className="w-full">Sitio</TableHead>
+            <TableHead className="text-right">Monto</TableHead>
+            <TableHead />
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -97,14 +98,8 @@ export function DraftList({ drafts, date, showRejection }: DraftListProps) {
             <React.Fragment key={d.id}>
               <TableRow>
                 <TableCell className="font-medium">{d.site}</TableCell>
-                <TableCell className="text-right tabular-nums">
-                  {formatMoney(d.start)}
-                </TableCell>
-                <TableCell className="text-right tabular-nums">
-                  {formatMoney(d.end)}
-                </TableCell>
                 <TableCell className="text-right tabular-nums font-medium">
-                  {formatMoney(d.end - d.start)}
+                  {formatMoney(d.amount)}
                 </TableCell>
                 <TableCell>
                   <Button
@@ -122,7 +117,7 @@ export function DraftList({ drafts, date, showRejection }: DraftListProps) {
               {showRejection && d.rejectionNote && (
                 <TableRow>
                   <TableCell
-                    colSpan={5}
+                    colSpan={3}
                     className="text-sm text-destructive whitespace-pre-wrap"
                   >
                     Motivo: {d.rejectionNote}
@@ -132,15 +127,11 @@ export function DraftList({ drafts, date, showRejection }: DraftListProps) {
             </React.Fragment>
           ))}
           <TableRow>
-            <TableCell className="font-medium">Total</TableCell>
-            <TableCell className="text-right tabular-nums">
-              {formatMoney(totalStart)}
+            <TableCell className="font-semibold w-full text-right">
+              Total:
             </TableCell>
-            <TableCell className="text-right tabular-nums">
-              {formatMoney(totalEnd)}
-            </TableCell>
-            <TableCell className="text-right tabular-nums font-medium">
-              {formatMoney(totalGain)}
+            <TableCell className="text-right tabular-nums font-semibold">
+              {formatMoney(totalAmount)}
             </TableCell>
             <TableCell />
           </TableRow>
@@ -149,15 +140,17 @@ export function DraftList({ drafts, date, showRejection }: DraftListProps) {
 
       {error && <p className="text-sm text-destructive">{error}</p>}
 
-      <Button
-        type="button"
-        onClick={send}
-        disabled={busy || isPending || drafts.length === 0}
-        className="w-full sm:w-fit self-end"
-      >
-        <SendIcon />
-        {isPending ? "Enviando…" : "Enviar parte completo"}
-      </Button>
+      {!hideSend && (
+        <Button
+          type="button"
+          onClick={send}
+          disabled={busy || isPending || drafts.length === 0}
+          className="w-full sm:w-fit self-end"
+        >
+          <SendIcon />
+          {isPending ? "Enviando…" : "Enviar"}
+        </Button>
+      )}
     </div>
   );
 }

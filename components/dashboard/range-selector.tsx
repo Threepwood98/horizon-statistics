@@ -62,11 +62,14 @@ export function RangeSelector({ range, from, to }: RangeSelectorProps) {
   }, [range, from, to]);
 
   const route = (nextRange: RangeKey, nextFrom?: string, nextTo?: string) => {
-    const params = new URLSearchParams();
+    const params = new URLSearchParams(window.location.search);
     params.set("range", nextRange);
     if (nextRange === "custom" && nextFrom && nextTo) {
       params.set("from", nextFrom);
       params.set("to", nextTo);
+    } else {
+      params.delete("from");
+      params.delete("to");
     }
     router.replace(`?${params.toString()}`);
   };

@@ -1,6 +1,6 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { getRange, toKey, addDaysKey, formatDateLabelUTC } from "@/lib/range";
+import { getRange, toKey, addDaysKey, formatDateLabelUTC, localDateKey } from "@/lib/range";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { StatCard } from "@/components/dashboard/stat-card";
@@ -29,7 +29,7 @@ export default async function DashboardPage({
   const sp = await searchParams;
   const now = new Date();
   const { range, where, rangeLabel } = getRange(sp, now);
-  const todayKey = toKey(now);
+  const todayKey = localDateKey(now);
   const todayStart = new Date(`${todayKey}T00:00:00Z`);
 
   const user = await prisma.user.findUnique({
@@ -53,7 +53,7 @@ export default async function DashboardPage({
     prisma.dailyReport.groupBy({
       by: ["date"],
       where: { status: "accepted" },
-      _sum: { startAmount: true, endAmount: true },
+      _sum: { amount: true },
     }),
     prisma.dailyReport.findMany({
       where: { date: todayStart, status: "accepted" },
@@ -86,7 +86,7 @@ export default async function DashboardPage({
   const dailyMap = new Map<string, number>();
   for (const r of rangeReports) {
     const key = toKey(r.date);
-    const gain = Number(r.endAmount) - Number(r.startAmount);
+    const gain = Number(r.amount);
     dailyMap.set(key, (dailyMap.get(key) || 0) + gain);
   }
   const dailyData = Array.from(dailyMap.entries())
@@ -103,13 +103,13 @@ export default async function DashboardPage({
       d.date.getUTCFullYear() === now.getUTCFullYear(),
   );
   const totalMonth = monthDays.reduce(
-    (s, d) => s + (Number(d._sum.endAmount) - Number(d._sum.startAmount)),
+    (s, d) => s + Number(d._sum.amount),
     0,
   );
   const avgMonth = monthDays.length > 0 ? totalMonth / monthDays.length : 0;
   const bestDay = statsHistory.reduce(
     (best, d) => {
-      const gain = Number(d._sum.endAmount) - Number(d._sum.startAmount);
+      const gain = Number(d._sum.amount);
       if (gain > best.total) {
         return {
           day: formatDateLabelUTC(toKey(d.date)),
@@ -123,7 +123,7 @@ export default async function DashboardPage({
 
   // Today
   const todayTotal = todayReports.reduce(
-    (s, r) => s + (Number(r.endAmount) - Number(r.startAmount)),
+    (s, r) => s + Number(r.amount),
     0,
   );
 
@@ -140,7 +140,7 @@ export default async function DashboardPage({
   const siteMap = new Map<string, number>();
   for (const r of rangeReports) {
     const name = r.website?.name || "Sin sitio";
-    const gain = Number(r.endAmount) - Number(r.startAmount);
+    const gain = Number(r.amount);
     siteMap.set(name, (siteMap.get(name) || 0) + gain);
   }
   const bySite = Array.from(siteMap.entries())
@@ -152,8 +152,7 @@ export default async function DashboardPage({
     date: formatDateLabelUTC(toKey(r.date)),
     site: r.website?.name || "-",
     worker: r.user?.name || "-",
-    startAmount: Number(r.startAmount),
-    endAmount: Number(r.endAmount),
+    amount: Number(r.amount),
   }));
 
   const teamId = user?.teamId ?? null;
@@ -163,7 +162,7 @@ export default async function DashboardPage({
     if (teamId == null) break;
     if (r.user?.teamId !== teamId) continue;
     const name = r.website?.name || "Sin sitio";
-    const gain = Number(r.endAmount) - Number(r.startAmount);
+    const gain = Number(r.amount);
     liveGainBySite.set(name, (liveGainBySite.get(name) || 0) + gain);
   }
 

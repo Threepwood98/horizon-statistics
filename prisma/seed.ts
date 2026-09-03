@@ -3,6 +3,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import "dotenv/config";
 import { randomBytes } from "node:crypto";
 import { hashPassword } from "@better-auth/utils/password";
+import { localDateKey } from "../lib/range";
 
 function generateId(): string {
   return randomBytes(16).toString("hex");
@@ -108,7 +109,7 @@ async function main() {
   const userById = new Map(users.map((u) => [u.id, u]));
 
   const now = new Date();
-  const nowKey = now.toISOString().slice(0, 10);
+  const nowKey = localDateKey(now);
   const reports = [];
 
   for (let i = 29; i >= 0; i--) {
@@ -123,9 +124,7 @@ async function main() {
 
       for (let j = 0; j < reportsForDay; j++) {
         const website = websites[Math.floor(Math.random() * websites.length)];
-        const startAmount = 100 + Math.random() * 400;
-        const change = 5 + Math.random() * 80;
-        const endAmount = startAmount + change;
+        const amount = 5 + Math.random() * 80;
 
         let status: "accepted" | "sent" | "draft";
         if (isToday) {
@@ -140,8 +139,7 @@ async function main() {
           userId: worker.id,
           websiteId: website.id,
           date,
-          startAmount: Math.round(startAmount * 100) / 100,
-          endAmount: Math.round(endAmount * 100) / 100,
+          amount: Math.round(amount * 100) / 100,
           status,
           sentAt: status === "draft" ? null : new Date(date.getTime() + 1000 * 60 * 60 * 12),
           acceptedAt:
@@ -162,8 +160,7 @@ async function main() {
     const teamId = userById.get(r.userId)?.teamId;
     if (teamId === undefined || teamId === null) continue;
     const key = `${teamId}:${r.websiteId}`;
-    const gain = Number(r.endAmount) - Number(r.startAmount);
-    balanceMap.set(key, (balanceMap.get(key) || 0) + gain);
+    balanceMap.set(key, (balanceMap.get(key) || 0) + Number(r.amount));
   }
 
   const balances = [];

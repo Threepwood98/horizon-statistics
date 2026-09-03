@@ -46,8 +46,7 @@ export default async function AprobacionesPage() {
     .map(([key, items]) => {
       const rows = items.map((r) => ({
         site: r.website?.name ?? "Sin sitio",
-        start: Number(r.startAmount),
-        end: Number(r.endAmount),
+        amount: Number(r.amount),
       }));
       return {
         id: items[0].id,

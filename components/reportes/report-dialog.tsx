@@ -15,12 +15,16 @@ import {
 import { ReportForm } from "@/components/reportes/report-form";
 
 interface ReportDialogProps {
-  websites: { id: number; name: string }[];
+  sites: { id: number; name: string; balanceInicio: number }[];
   date: string;
   rangeLabel: string;
 }
 
-export function ReportDialog({ websites, date, rangeLabel }: ReportDialogProps) {
+export function ReportDialog({
+  sites,
+  date,
+  rangeLabel,
+}: ReportDialogProps) {
   const [open, setOpen] = React.useState(false);
 
   return (
@@ -28,7 +32,7 @@ export function ReportDialog({ websites, date, rangeLabel }: ReportDialogProps) 
       <DialogTrigger
         render={
           <Button>
-            <PlusIcon data-icon="inline-start" />
+            <PlusIcon />
             Nuevo reporte
           </Button>
         }
@@ -42,7 +46,7 @@ export function ReportDialog({ websites, date, rangeLabel }: ReportDialogProps) 
           </DialogDescription>
         </DialogHeader>
         <ReportForm
-          websites={websites}
+          sites={sites}
           date={date}
           onSuccess={() => setOpen(false)}
         />

@@ -173,7 +173,7 @@ export function AppSidebar({
     {
       title: "Reportes",
       url: "/reportes",
-      icon: <FileChartColumnIcon />,
+      icon: <ClipboardListIcon />,
     },
     ...(canApprove
       ? [

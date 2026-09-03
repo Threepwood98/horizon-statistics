@@ -14,6 +14,13 @@ export function toKey(date: Date): string {
   return date.toISOString().split("T")[0];
 }
 
+export function localDateKey(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
 export function utcStart(key: string): Date {
   return new Date(`${key}T00:00:00Z`);
 }
@@ -39,7 +46,7 @@ function parseDate(value: string | undefined): string | null {
 }
 
 export function getRange(params: RangeParams, now = new Date()): RangeResult {
-  const todayKey = toKey(now);
+  const todayKey = localDateKey(now);
   const tomorrowKey = addDaysKey(todayKey, 1);
   const tomorrowStart = utcStart(tomorrowKey);
 
@@ -51,7 +58,7 @@ export function getRange(params: RangeParams, now = new Date()): RangeResult {
 
   switch (params.range) {
     case "week": {
-      const dayOfWeek = now.getUTCDay();
+      const dayOfWeek = now.getDay();
       const offset = (dayOfWeek + 6) % 7;
       return {
         range: "week",

@@ -12,8 +12,7 @@ interface HistoryEntry {
   date: string;
   site: string;
   worker: string;
-  startAmount: number;
-  endAmount: number;
+  amount: number;
 }
 
 interface RecentHistoryProps {
@@ -28,9 +27,7 @@ export function RecentHistory({ data }: RecentHistoryProps) {
           <TableHead>Fecha</TableHead>
           <TableHead>Sitio</TableHead>
           <TableHead>Trabajador</TableHead>
-          <TableHead className="text-right">Inicio</TableHead>
-          <TableHead className="text-right">Final</TableHead>
-          <TableHead className="text-right">Ganancia</TableHead>
+          <TableHead className="text-right">Monto</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -39,14 +36,8 @@ export function RecentHistory({ data }: RecentHistoryProps) {
             <TableCell className="font-mono text-xs">{entry.date}</TableCell>
             <TableCell>{entry.site}</TableCell>
             <TableCell>{entry.worker}</TableCell>
-            <TableCell className="text-right font-mono text-xs">
-              {formatMoney(entry.startAmount)}
-            </TableCell>
-            <TableCell className="text-right font-mono text-xs">
-              {formatMoney(entry.endAmount)}
-            </TableCell>
             <TableCell className="text-right font-mono text-xs font-bold text-primary">
-              {formatMoney(entry.endAmount - entry.startAmount)}
+              {formatMoney(entry.amount)}
             </TableCell>
           </TableRow>
         ))}

@@ -46,8 +46,7 @@ model DailyReport {
   websiteId     BigInt?
   website       Website?  @relation(fields: [websiteId], references: [id])
   date          DateTime  @db.Date
-  startAmount   Decimal   @db.Decimal
-  endAmount     Decimal   @db.Decimal
+  amount        Decimal   @db.Decimal
   status        String    @default("draft")
   sentAt        DateTime?
   acceptedAt    DateTime?

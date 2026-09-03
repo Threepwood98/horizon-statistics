@@ -29,21 +29,17 @@ function isManagerOrAdmin(role: string): boolean {
 export async function addReport(input: {
   date: string;
   websiteId: number;
-  startAmount: number;
-  endAmount: number;
+  amount: number;
 }): Promise<ActionResult> {
   const { userId } = await requireAuthedUser();
 
   const date = toDateKey(input.date);
-  const startAmount = Number(input.startAmount);
-  const endAmount = Number(input.endAmount);
+  const amount = Number(input.amount);
   const websiteId = Number(input.websiteId);
 
   if (!input.date) return { error: "Indicá la fecha" };
-  if (Number.isNaN(startAmount) || startAmount < 0)
-    return { error: "Monto inicial inválido" };
-  if (Number.isNaN(endAmount) || endAmount < startAmount)
-    return { error: "El monto final no puede ser menor al inicial" };
+  if (Number.isNaN(amount) || amount < 0)
+    return { error: "Monto inválido" };
 
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
@@ -73,8 +69,7 @@ export async function addReport(input: {
     await prisma.dailyReport.update({
       where: { id: draft.id },
       data: {
-        startAmount: draft.startAmount.add(startAmount),
-        endAmount: draft.endAmount.add(endAmount),
+        amount: draft.amount.add(amount),
       },
     });
   } else {
@@ -83,8 +78,7 @@ export async function addReport(input: {
         userId,
         websiteId,
         date,
-        startAmount,
-        endAmount,
+        amount,
         status: "draft",
       },
     });
@@ -100,6 +94,45 @@ export async function deleteDraft(id: number): Promise<ActionResult> {
   if (!report || report.userId !== userId || report.status !== "draft")
     return { error: "No podés eliminar ese reporte" };
   await prisma.dailyReport.delete({ where: { id } });
+  revalidatePath("/reportes");
+  return { ok: true };
+}
+
+export async function updateReport(
+  reportId: number,
+  input: { websiteId: number; amount: number },
+): Promise<ActionResult> {
+  const { userId } = await requireAuthedUser();
+
+  const amount = Number(input.amount);
+  const websiteId = Number(input.websiteId);
+
+  if (Number.isNaN(amount) || amount < 0) return { error: "Monto inválido" };
+
+  const report = await prisma.dailyReport.findUnique({ where: { id: reportId } });
+  if (!report || report.status !== "draft" || report.userId !== userId)
+    return { error: "No podés editar ese reporte" };
+  if (!report.rejectionNote)
+    return { error: "Ese reporte no está rechazado" };
+
+  if (report.websiteId != null && Number(report.websiteId) !== websiteId) {
+    const collision = await prisma.dailyReport.findFirst({
+      where: {
+        userId,
+        websiteId,
+        date: report.date,
+        status: { in: ["draft", "sent", "accepted"] },
+        NOT: { id: report.id },
+      },
+    });
+    if (collision) return { error: "Ya tenés un reporte para ese sitio ese día" };
+  }
+
+  await prisma.dailyReport.update({
+    where: { id: report.id },
+    data: { websiteId, amount, rejectionNote: null },
+  });
+
   revalidatePath("/reportes");
   return { ok: true };
 }
@@ -145,7 +178,7 @@ export async function acceptReport(reportId: number): Promise<ActionResult> {
   if (!(await canManageReport(user)))
     return { error: "No tenés permisos para aprobar ese parte" };
 
-  const gain = Number(report.endAmount) - Number(report.startAmount);
+  const gain = Number(report.amount);
   const teamId = report.user?.teamId;
   const websiteId = report.websiteId;
 

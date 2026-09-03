@@ -3,9 +3,9 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
-import { PlusIcon } from "lucide-react";
+import { PlusIcon, SaveIcon } from "lucide-react";
 
-import { addReport } from "@/lib/actions/reportes";
+import { addReport, updateReport } from "@/lib/actions/reportes";
 import { Button } from "@/components/ui/button";
 import {
   Field,
@@ -24,41 +24,54 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 
 interface ReportFormProps {
-  websites: { id: number; name: string }[];
+  sites: { id: number; name: string; balanceInicio: number }[];
   date: string;
+  reportId?: number;
+  initial?: { websiteId: number; amount: number };
   onSuccess?: () => void;
 }
 
-export function ReportForm({ websites, date, onSuccess }: ReportFormProps) {
+export function ReportForm({
+  sites,
+  date,
+  reportId,
+  initial,
+  onSuccess,
+}: ReportFormProps) {
   const router = useRouter();
-  const [websiteId, setWebsiteId] = React.useState<string | null>(null);
-  const [startAmount, setStartAmount] = React.useState("");
-  const [endAmount, setEndAmount] = React.useState("");
+  const [websiteId, setWebsiteId] = React.useState<string | null>(
+    initial ? String(initial.websiteId) : null,
+  );
+  const [amount, setAmount] = React.useState(initial ? String(initial.amount) : "");
   const [error, setError] = React.useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  const selectedSite = sites.find((s) => websiteId != null && String(s.id) === websiteId);
 
   const submit = () => {
     setError(null);
     startTransition(async () => {
-      const result = await addReport({
-        date,
-        websiteId: Number(websiteId),
-        startAmount: Number(startAmount),
-        endAmount: Number(endAmount),
-      });
+      const result = reportId
+        ? await updateReport(reportId, {
+            websiteId: Number(websiteId),
+            amount: Number(amount),
+          })
+        : await addReport({
+            date,
+            websiteId: Number(websiteId),
+            amount: Number(amount),
+          });
       if (result?.error) {
         setError(result.error);
         return;
       }
-      setStartAmount("");
-      setEndAmount("");
-      setWebsiteId(null);
+      setAmount("");
       onSuccess?.();
       router.refresh();
     });
   };
 
-  const ready = Boolean(websiteId) && startAmount !== "" && endAmount !== "";
+  const ready = Boolean(websiteId) && amount !== "";
 
   return (
     <form onSubmit={(e) => { e.preventDefault(); submit(); }} className="flex flex-col gap-4">
@@ -71,9 +84,9 @@ export function ReportForm({ websites, date, onSuccess }: ReportFormProps) {
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                {websites.map((w) => (
-                  <SelectItem key={w.id} value={String(w.id)}>
-                    {w.name}
+                {sites.map((s) => (
+                  <SelectItem key={s.id} value={String(s.id)}>
+                    {s.name}
                   </SelectItem>
                 ))}
               </SelectGroup>
@@ -90,31 +103,29 @@ export function ReportForm({ websites, date, onSuccess }: ReportFormProps) {
               </InputGroupAddon>
               <InputGroupInput
                 id="report-start"
-                type="number"
-                inputMode="decimal"
-                min="0"
-                step="0.01"
+                value={
+                  selectedSite ? selectedSite.balanceInicio.toFixed(2) : ""
+                }
                 placeholder="0.00"
-                value={startAmount}
-                onChange={(e) => setStartAmount(e.target.value)}
+                readOnly
               />
             </InputGroup>
           </Field>
           <Field>
-            <FieldLabel htmlFor="report-end">Final</FieldLabel>
+            <FieldLabel htmlFor="report-amount">Monto</FieldLabel>
             <InputGroup>
               <InputGroupAddon>
                 $
               </InputGroupAddon>
               <InputGroupInput
-                id="report-end"
+                id="report-amount"
                 type="number"
                 inputMode="decimal"
                 min="0"
                 step="0.01"
                 placeholder="0.00"
-                value={endAmount}
-                onChange={(e) => setEndAmount(e.target.value)}
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
               />
             </InputGroup>
           </Field>
@@ -124,8 +135,20 @@ export function ReportForm({ websites, date, onSuccess }: ReportFormProps) {
       {error && <p className="text-sm text-destructive">{error}</p>}
 
       <Button type="submit" className="w-full" disabled={!ready || isPending}>
-        {isPending ? <Spinner /> : <PlusIcon data-icon="inline-start" />}
-        {isPending ? "Agregando…" : "Agregar"}
+        {isPending ? (
+          <Spinner />
+        ) : reportId ? (
+          <SaveIcon data-icon="inline-start" />
+        ) : (
+          <PlusIcon data-icon="inline-start" />
+        )}
+        {isPending
+          ? reportId
+            ? "Guardando…"
+            : "Agregando…"
+          : reportId
+            ? "Guardar"
+            : "Agregar"}
       </Button>
     </form>
   );
