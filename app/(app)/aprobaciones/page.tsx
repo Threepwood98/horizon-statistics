@@ -5,7 +5,7 @@ import { ArrowLeftIcon, InboxIcon } from "lucide-react";
 
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
-import { toKey, formatDateLabelUTC } from "@/lib/range";
+import { toKey } from "@/lib/range";
 import { ApprovalList } from "@/components/reportes/approval-list";
 
 export default async function AprobacionesPage() {
@@ -46,18 +46,57 @@ export default async function AprobacionesPage() {
     .map(([key, items]) => {
       const rows = items.map((r) => ({
         site: r.website?.name ?? "Sin sitio",
+        originalSite:
+          r.originalWebsiteId != null
+            ? items.find((x) => Number(x.websiteId) === Number(r.originalWebsiteId))
+                ?.website?.name ??
+              String(r.originalWebsiteId)
+            : null,
         amount: Number(r.amount),
-      }));
+        originalAmount:
+          r.originalAmount != null ? Number(r.originalAmount) : null,
+        rectified: r.rectified,
+      } as { site: string; originalSite: string | null; amount: number; originalAmount: number | null; rectified: boolean }));
       return {
         id: items[0].id,
         reportIds: items.map((r) => Number(r.id)),
         userName: items[0].user?.name ?? "Desconocido",
-        dateLabel: formatDateLabelUTC(toKey(items[0].date)),
+        teamName: items[0].user?.team?.name ?? "Sin equipo",
+        dateKey: toKey(items[0].date),
+        rectified: items.some((r) => r.rectified),
         rows,
       };
     })
-    .sort((a, b) => a.dateLabel.localeCompare(b.dateLabel))
+    .sort((a, b) => a.dateKey.localeCompare(b.dateKey))
     .sort((a, b) => (a.userName < b.userName ? -1 : 1));
+
+  const teamGroups = Array.from(
+    groupList.reduce((map, g) => {
+      const subtotal = g.rows.reduce((s, r) => s + r.amount, 0);
+      const existing = map.get(g.teamName);
+      const entry = {
+        id: Number(g.id),
+        reportIds: g.reportIds,
+        userName: g.userName,
+        dateKey: g.dateKey,
+        rectified: g.rectified,
+        rows: g.rows,
+      };
+      if (existing) {
+        existing.subtotal += subtotal;
+        existing.groups.push(entry);
+      } else {
+        map.set(g.teamName, {
+          id: g.teamName,
+          teamName: g.teamName,
+          subtotal,
+          groups: [entry],
+        });
+      }
+      return map;
+    }, new Map<string, { id: string; teamName: string; subtotal: number; groups: { id: number; reportIds: number[]; userName: string; dateKey: string; rectified: boolean; rows: { site: string; originalSite: string | null; amount: number; originalAmount: number | null; rectified: boolean }[] }[] }>()),
+    ([, t]) => t,
+  ).sort((a, b) => a.teamName.localeCompare(b.teamName));
 
   return (
     <div className="flex min-h-svh flex-col bg-background p-6 md:p-10">
@@ -82,16 +121,7 @@ export default async function AprobacionesPage() {
       </div>
 
       <div className="mt-6 max-w-3xl">
-        <ApprovalList
-          groups={groupList.map((g) => ({
-            id: Number(g.id),
-            reportIds: g.reportIds,
-            userName: g.userName,
-            dateLabel: g.dateLabel,
-            rows: g.rows,
-          }))}
-          canManage={canManage}
-        />
+        <ApprovalList teams={teamGroups} canManage={canManage} />
       </div>
     </div>
   );

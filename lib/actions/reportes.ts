@@ -130,7 +130,7 @@ export async function updateReport(
 
   await prisma.dailyReport.update({
     where: { id: report.id },
-    data: { websiteId, amount, rejectionNote: null },
+    data: { websiteId, amount },
   });
 
   revalidatePath("/reportes");
@@ -159,6 +159,47 @@ export async function sendPart(date: string): Promise<ActionResult> {
   });
 
   revalidatePath("/reportes");
+  return { ok: true };
+}
+
+export async function resendRectified(
+  date: string,
+  markedRowIds: number[],
+): Promise<ActionResult> {
+  const { userId } = await requireAuthedUser();
+
+  const rejected = await prisma.dailyReport.findMany({
+    where: { userId, date: toDateKey(date), status: "draft" },
+  });
+  const rejectedWithNote = rejected.filter((r) => r.rejectionNote);
+  if (rejectedWithNote.length === 0)
+    return { error: "No hay reportes rechazados para ese día" };
+
+  const markedSet = new Set(markedRowIds.map(Number));
+  for (const r of rejectedWithNote) {
+    if (!markedSet.has(Number(r.id))) continue;
+    const originalAmount = r.originalAmount != null ? Number(r.originalAmount) : null;
+    const originalWebsiteId =
+      r.originalWebsiteId != null ? Number(r.originalWebsiteId) : null;
+    const unchanged =
+      originalAmount !== null &&
+      Number(r.amount) === originalAmount &&
+      (originalWebsiteId === null ||
+        r.websiteId == null ||
+        Number(r.websiteId) === originalWebsiteId);
+    if (unchanged)
+      return {
+        error: "Corregí las filas marcadas antes de reenviar el reporte",
+      };
+  }
+
+  await prisma.dailyReport.updateMany({
+    where: { id: { in: rejectedWithNote.map((r) => r.id) } },
+    data: { status: "sent", sentAt: new Date(), rectified: true, rejectionNote: null, marked: false },
+  });
+
+  revalidatePath("/reportes");
+  revalidatePath("/aprobaciones");
   return { ok: true };
 }
 
@@ -216,6 +257,7 @@ export async function acceptReport(reportId: number): Promise<ActionResult> {
 export async function rejectReport(
   reportId: number,
   note: string,
+  markedRowIds?: number[],
 ): Promise<ActionResult> {
   const { user } = await requireAuthedUser();
 
@@ -230,10 +272,31 @@ export async function rejectReport(
   if (!(await canManageReport(user)))
     return { error: "No tenés permisos para rechazar ese parte" };
 
-  await prisma.dailyReport.update({
-    where: { id: report.id },
-    data: { status: "draft", sentAt: null, acceptedAt: null, rejectionNote: noteText },
+  const markedSet = new Set((markedRowIds ?? []).map(Number));
+  const dayReports = await prisma.dailyReport.findMany({
+    where: { userId: report.userId, date: report.date, status: "sent" },
   });
+  if (dayReports.length === 0)
+    return { error: "Ese parte no está pendiente de aprobación" };
+
+  await prisma.$transaction(
+    dayReports.map((r) =>
+      prisma.dailyReport.update({
+        where: { id: r.id },
+        data: {
+          status: "draft",
+          sentAt: null,
+          acceptedAt: null,
+          rejectionNote: noteText,
+          marked: markedSet.has(Number(r.id)),
+          originalAmount: r.amount,
+          originalWebsiteId: r.websiteId,
+          rectified: false,
+          resentAt: null,
+        },
+      }),
+    ),
+  );
 
   revalidatePath("/reportes");
   revalidatePath("/aprobaciones");

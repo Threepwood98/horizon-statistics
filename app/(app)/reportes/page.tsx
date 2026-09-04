@@ -7,6 +7,8 @@ import {
   ClipboardIcon,
   ClipboardListIcon,
   ClipboardPlusIcon,
+  ClipboardXIcon,
+  PencilIcon,
   XCircleIcon,
 } from "lucide-react";
 
@@ -32,6 +34,7 @@ import { DraftList } from "@/components/reportes/draft-list";
 import { SentReports } from "@/components/reportes/sent-reports";
 import { RejectedReportDialog } from "@/components/reportes/rejected-report-dialog";
 import { AcceptedHistory } from "@/components/reportes/accepted-history";
+import { Badge } from "@/components/ui/badge";
 
 export default async function ReportesPage({
   searchParams,
@@ -129,9 +132,23 @@ export default async function ReportesPage({
   }));
 
   const partialRows = draftRows.filter((d) => !d.rejectionNote);
-  const rejectedRows = draftRows
-    .filter((d) => d.rejectionNote)
-    .filter((d): d is typeof d & { websiteId: number } => d.websiteId != null);
+  const rejectedRows = drafts
+    .filter((r) => r.rejectionNote)
+    .filter((r): r is typeof r & { websiteId: number } => r.websiteId != null)
+    .map((r) => ({
+      id: Number(r.id),
+      websiteId: Number(r.websiteId),
+      site: r.website?.name ?? "Sin sitio",
+      amount: Number(r.amount),
+      rejectionNote: r.rejectionNote,
+      marked: r.marked,
+      originalAmount:
+        r.originalAmount != null ? Number(r.originalAmount) : null,
+      originalSite:
+        r.originalWebsiteId != null
+          ? (websites.find((w) => w.id === r.originalWebsiteId)?.name ?? null)
+          : null,
+    }));
 
   const sentRows = sentList.map((r) => ({
     site: r.website?.name ?? "Sin sitio",
@@ -248,12 +265,16 @@ export default async function ReportesPage({
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base text-destructive">
-              <XCircleIcon />
-              Reportes Rechazados
+            <CardTitle className="flex gap-2 text-base">
+              <ClipboardXIcon />
+              Reporte Rechazado
             </CardTitle>
             <CardDescription>
-              Rechazados por el manager. Hacé clic en Editar para corregirlos.
+              Rechazado por el manager. Haz click en{" "}
+              <Badge variant="secondary" className="text-sm">
+                <PencilIcon /> editar
+              </Badge>
+              {" "}para corregirlos.
             </CardDescription>
           </CardHeader>
           <CardContent>

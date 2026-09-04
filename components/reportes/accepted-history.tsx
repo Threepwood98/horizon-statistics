@@ -1,8 +1,10 @@
 import { CalendarDaysIcon } from "lucide-react";
 
-import { formatDateLabelUTC } from "@/lib/range";
-import { formatMoney } from "@/lib/format";
-import { RangeSelector, type RangeKey } from "@/components/dashboard/range-selector";
+import { formatLongDate, formatMoney } from "@/lib/format";
+import {
+  RangeSelector,
+  type RangeKey,
+} from "@/components/dashboard/range-selector";
 import {
   Accordion,
   AccordionContent,
@@ -62,8 +64,7 @@ export function AcceptedHistory({
                   )}
                   <span>{group.teamName}</span>
                   <span className="inline-flex items-center gap-1 text-muted-foreground">
-                    <CalendarDaysIcon />
-                    {formatDateLabelUTC(group.dateKey)}
+                    {formatLongDate(group.dateKey)}
                   </span>
                   <span className="ml-auto font-semibold tabular-nums">
                     Total {formatMoney(group.totalAmount)}

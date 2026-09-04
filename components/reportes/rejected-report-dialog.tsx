@@ -1,8 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { PencilIcon } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useTransition } from "react";
+import { AlertTriangleIcon, PencilIcon, SendIcon } from "lucide-react";
 
+import { resendRectified } from "@/lib/actions/reportes";
 import { formatMoney } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,6 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Spinner } from "@/components/ui/spinner";
 import { ReportForm } from "@/components/reportes/report-form";
 
 interface RejectedRow {
@@ -27,7 +31,10 @@ interface RejectedRow {
   websiteId: number;
   site: string;
   amount: number;
-  rejectionNote?: string | null;
+  rejectionNote: string | null;
+  marked: boolean;
+  originalAmount: number | null;
+  originalSite: string | null;
 }
 
 interface RejectedReportDialogProps {
@@ -41,9 +48,12 @@ export function RejectedReportDialog({
   sites,
   date,
 }: RejectedReportDialogProps) {
+  const router = useRouter();
   const [editingId, setEditingId] = React.useState<number | null>(null);
-  const editingReport = rows.find((r) => r.id === editingId) ?? null;
+  const [error, setError] = React.useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
 
+  const editingReport = rows.find((r) => r.id === editingId) ?? null;
   const close = () => setEditingId(null);
 
   if (rows.length === 0) {
@@ -54,58 +64,126 @@ export function RejectedReportDialog({
     );
   }
 
+  const markedRows = rows.filter((r) => r.marked);
+  const rowChanged = (r: RejectedRow) =>
+    (r.originalAmount !== null && r.amount !== r.originalAmount) ||
+    (r.originalSite !== null && r.site !== r.originalSite);
+  const allMarkedFixed = markedRows.every(rowChanged);
+  const canResend = markedRows.length === 0 || allMarkedFixed;
+
+  const reason = rows[0]?.rejectionNote ?? "";
+
+  const resend = () => {
+    setError(null);
+    startTransition(async () => {
+      const result = await resendRectified(
+        date,
+        markedRows.map((r) => r.id),
+      );
+      if (result?.error) {
+        setError(result.error);
+        return;
+      }
+      router.refresh();
+    });
+  };
+
+  const resendHint =
+    markedRows.length > 0 && !allMarkedFixed
+      ? "Corrige las filas marcadas para habilitar el reenvío."
+      : "";
+
   return (
-    <>
+    <div className="flex flex-col gap-2">
+      {reason && <p className="text-destructive">{reason}</p>}
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="w-full">Sitio</TableHead>
-            <TableHead className="text-right">Monto</TableHead>
-            <TableHead className="w-16" />
+            <TableHead className="w-full font-semibold">Sitio</TableHead>
+            <TableHead className="text-right font-semibold">Monto</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {rows.map((r) => (
-            <TableRow key={r.id}>
-              <TableCell className="font-medium">{r.site}</TableCell>
-              <TableCell className="text-right tabular-nums font-medium">
-                {formatMoney(r.amount)}
-              </TableCell>
-              <TableCell>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={`Editar reporte rechazado de ${r.site}`}
-                  onClick={() => setEditingId(r.id)}
-                >
-                  <PencilIcon />
-                </Button>
-              </TableCell>
-            </TableRow>
-          ))}
+          {rows.map((r) => {
+            const siteChanged =
+              r.originalSite != null && r.originalSite !== r.site;
+            const amountChanged =
+              r.originalAmount != null && r.amount !== r.originalAmount;
+            const changed = siteChanged || amountChanged;
+
+            return (
+              <TableRow
+                key={r.id}
+                className={r.marked && !changed ? "bg-destructive/5" : ""}
+              >
+                <TableCell className={"font-medium flex items-center gap-4"}>
+                  {siteChanged ? (
+                    <div>
+                      {r.site}
+                      <span className="text-destructive line-through ml-4">
+                        {r.originalSite}
+                      </span>
+                    </div>
+                  ) : (
+                    `${r.site}`
+                  )}
+                  {r.marked && !changed && (
+                    <AlertTriangleIcon className="text-destructive size-4" />
+                  )}
+                </TableCell>
+                <TableCell className={`text-right tabular-nums font-medium`}>
+                  {r.originalAmount != null &&
+                  r.originalAmount !== r.amount &&
+                  amountChanged ? (
+                    <div>
+                      <span className="text-destructive line-through mr-4">
+                        {formatMoney(r.originalAmount)}
+                      </span>
+                      {formatMoney(r.amount)}
+                    </div>
+                  ) : (
+                    formatMoney(r.amount)
+                  )}
+                </TableCell>
+                <TableCell>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={`Editar reporte rechazado de ${r.site}`}
+                    disabled={isPending}
+                    onClick={() => setEditingId(r.id)}
+                  >
+                    <PencilIcon />
+                  </Button>
+                </TableCell>
+              </TableRow>
+            );
+          })}
         </TableBody>
       </Table>
+
+      {error && <p className="text-sm text-destructive">{error}</p>}
+      {resendHint && <p className="text-sm text-amber-600">{resendHint}</p>}
+
+      <Button
+        type="button"
+        className="w-full sm:w-fit self-end"
+        disabled={isPending || !canResend}
+        onClick={resend}
+      >
+        {isPending ? <Spinner /> : <SendIcon />}
+        {isPending ? "Reenviando…" : " Reenviar"}
+      </Button>
 
       <Dialog open={editingReport != null} onOpenChange={(o) => !o && close()}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Editar reporte rechazado</DialogTitle>
             <DialogDescription>
-              {editingReport && (
-                <>
-                  Sitio: <span className="font-medium">{editingReport.site}</span>
-                  {editingReport.rejectionNote && (
-                    <>
-                      <br />
-                      Motivo del rechazo:{" "}
-                      <span className="text-destructive font-medium">
-                        {editingReport.rejectionNote}
-                      </span>
-                    </>
-                  )}
-                </>
-              )}
+              {editingReport && editingReport.rejectionNote
+                ? `Motivo del rechazo: ${editingReport.rejectionNote}`
+                : "Corregí los valores y guardá los cambios."}
             </DialogDescription>
           </DialogHeader>
           {editingReport && (
@@ -122,6 +200,6 @@ export function RejectedReportDialog({
           )}
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   );
 }

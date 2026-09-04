@@ -51,6 +51,11 @@ model DailyReport {
   sentAt        DateTime?
   acceptedAt    DateTime?
   rejectionNote String?
+  marked        Boolean   @default(false)
+  originalAmount Decimal? @db.Decimal
+  originalWebsiteId BigInt?
+  rectified     Boolean   @default(false)
+  resentAt      DateTime?
 
   @@index([userId, date], name: "idx_reports_user_date")
   @@index([websiteId, date], name: "idx_reports_website_date")
