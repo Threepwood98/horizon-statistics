@@ -44,6 +44,9 @@ export default async function ReportesPage({
     range?: string;
     from?: string;
     to?: string;
+    rejRange?: string;
+    rejFrom?: string;
+    rejTo?: string;
   }>;
 }) {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -61,6 +64,7 @@ export default async function ReportesPage({
     from: sp.from,
     to: sp.to,
   };
+  const rejectedRange = getRange(sp, now, "rej");
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
@@ -132,28 +136,77 @@ export default async function ReportesPage({
   }));
 
   const partialRows = draftRows.filter((d) => !d.rejectionNote);
-  const rejectedRows = drafts
-    .filter((r) => r.rejectionNote)
-    .filter((r): r is typeof r & { websiteId: number } => r.websiteId != null)
-    .map((r) => ({
-      id: Number(r.id),
-      websiteId: Number(r.websiteId),
-      site: r.website?.name ?? "Sin sitio",
-      amount: Number(r.amount),
-      rejectionNote: r.rejectionNote,
-      marked: r.marked,
-      originalAmount:
-        r.originalAmount != null ? Number(r.originalAmount) : null,
-      originalSite:
-        r.originalWebsiteId != null
-          ? (websites.find((w) => w.id === r.originalWebsiteId)?.name ?? null)
-          : null,
-    }));
 
   const sentRows = sentList.map((r) => ({
     site: r.website?.name ?? "Sin sitio",
     amount: Number(r.amount),
   }));
+
+  const rejectedHistory = await prisma.dailyReport.findMany({
+    where: {
+      ...(isGlobal ? {} : { userId: user.id }),
+      date: rejectedRange.where,
+      status: "draft",
+      rejectionNote: { not: null },
+    },
+    include: { website: true, user: { include: { team: true } } },
+    orderBy: [{ date: "desc" }, { id: "asc" }],
+  });
+
+  type RejectedGroup = {
+    id: string;
+    userName: string;
+    teamName: string;
+    dateKey: string;
+    totalAmount: number;
+    rows: {
+      id: number;
+      websiteId: number;
+      site: string;
+      amount: number;
+      rejectionNote: string | null;
+      marked: boolean;
+      originalAmount: number | null;
+      originalSite: string | null;
+    }[];
+  };
+
+  const rejectedGroups = Array.from(
+    rejectedHistory.reduce((map, r) => {
+      const key = `${r.userId}:${toKey(r.date)}`;
+      const existing = map.get(key);
+      const row = {
+        id: Number(r.id),
+        websiteId: r.websiteId != null ? Number(r.websiteId) : 0,
+        site: r.website?.name ?? "Sin sitio",
+        amount: Number(r.amount),
+        rejectionNote: r.rejectionNote,
+        marked: r.marked,
+        originalAmount:
+          r.originalAmount != null ? Number(r.originalAmount) : null,
+        originalSite:
+          r.originalWebsiteId != null
+            ? (websites.find((w) => w.id === r.originalWebsiteId)?.name ?? null)
+            : null,
+      };
+      if (existing) {
+        existing.totalAmount += row.amount;
+        existing.rows.push(row);
+      } else {
+        map.set(key, {
+          id: key,
+          userName:
+            r.user?.displayUsername || r.user?.name || "Usuario",
+          teamName: r.user?.team?.name ?? "Sin equipo",
+          dateKey: toKey(r.date),
+          totalAmount: row.amount,
+          rows: [row],
+        });
+      }
+      return map;
+    }, new Map<string, RejectedGroup>()),
+    ([, g]) => g,
+  ).sort((a, b) => (a.dateKey < b.dateKey ? 1 : a.dateKey > b.dateKey ? -1 : 0));
 
   type AcceptedGroup = {
     id: string;
@@ -279,9 +332,13 @@ export default async function ReportesPage({
           </CardHeader>
           <CardContent>
             <RejectedReportDialog
-              rows={rejectedRows}
+              groups={rejectedGroups}
               sites={sites}
-              date={dateKey}
+              showName={isGlobal}
+              range={rejectedRange.range}
+              from={sp.rejFrom}
+              to={sp.rejTo}
+              prefix="rej"
             />
           </CardContent>
         </Card>

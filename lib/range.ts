@@ -45,7 +45,13 @@ function parseDate(value: string | undefined): string | null {
   return Number.isNaN(date.getTime()) ? null : value;
 }
 
-export function getRange(params: RangeParams, now = new Date()): RangeResult {
+export function getRange(
+  params: RangeParams,
+  now = new Date(),
+  prefix = "",
+): RangeResult {
+  const key = (name: "range" | "from" | "to") =>
+    params[`${prefix}${name}` as keyof RangeParams];
   const todayKey = localDateKey(now);
   const tomorrowKey = addDaysKey(todayKey, 1);
   const tomorrowStart = utcStart(tomorrowKey);
@@ -56,7 +62,7 @@ export function getRange(params: RangeParams, now = new Date()): RangeResult {
     rangeLabel: "mes actual",
   });
 
-  switch (params.range) {
+  switch (key("range")) {
     case "week": {
       const dayOfWeek = now.getDay();
       const offset = (dayOfWeek + 6) % 7;
@@ -70,8 +76,8 @@ export function getRange(params: RangeParams, now = new Date()): RangeResult {
       };
     }
     case "custom": {
-      const from = parseDate(params.from);
-      const to = parseDate(params.to);
+      const from = parseDate(key("from"));
+      const to = parseDate(key("to"));
       if (from && to && from <= to) {
         const toEndKey = addDaysKey(to, 1);
         return {

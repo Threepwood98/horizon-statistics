@@ -22,6 +22,7 @@ interface RangeSelectorProps {
   range: RangeKey;
   from?: string;
   to?: string;
+  prefix?: string;
 }
 
 function keyFromDate(date: Date): string {
@@ -49,7 +50,7 @@ function formatLabel(date: Date): string {
   return format(date, "d MMM.", { locale: es });
 }
 
-export function RangeSelector({ range, from, to }: RangeSelectorProps) {
+export function RangeSelector({ range, from, to, prefix = "" }: RangeSelectorProps) {
   const router = useRouter();
   const [active, setActive] = React.useState<RangeKey>(range);
   const [dateRange, setDateRange] = React.useState<DateRange | undefined>(
@@ -63,13 +64,13 @@ export function RangeSelector({ range, from, to }: RangeSelectorProps) {
 
   const route = (nextRange: RangeKey, nextFrom?: string, nextTo?: string) => {
     const params = new URLSearchParams(window.location.search);
-    params.set("range", nextRange);
+    params.set(`${prefix}range`, nextRange);
     if (nextRange === "custom" && nextFrom && nextTo) {
-      params.set("from", nextFrom);
-      params.set("to", nextTo);
+      params.set(`${prefix}from`, nextFrom);
+      params.set(`${prefix}to`, nextTo);
     } else {
-      params.delete("from");
-      params.delete("to");
+      params.delete(`${prefix}from`);
+      params.delete(`${prefix}to`);
     }
     router.replace(`?${params.toString()}`);
   };
