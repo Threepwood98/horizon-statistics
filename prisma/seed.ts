@@ -48,6 +48,7 @@ async function main() {
   console.log("Seeding database...");
 
   await prisma.dailyReport.deleteMany();
+  await prisma.turnoClose.deleteMany();
   await prisma.balance.deleteMany();
   await prisma.session.deleteMany();
   await prisma.account.deleteMany();
@@ -125,6 +126,7 @@ async function main() {
       for (let j = 0; j < reportsForDay; j++) {
         const website = websites[Math.floor(Math.random() * websites.length)];
         const amount = 5 + Math.random() * 80;
+        const shift = (Math.random() < 0.5 ? "MANANA" : "TARDE") as "MANANA" | "TARDE";
 
         let status: "accepted" | "sent" | "draft";
         if (isToday) {
@@ -139,6 +141,7 @@ async function main() {
           userId: worker.id,
           websiteId: website.id,
           date,
+          shift,
           amount: Math.round(amount * 100) / 100,
           status,
           sentAt: status === "draft" ? null : new Date(date.getTime() + 1000 * 60 * 60 * 12),
@@ -152,6 +155,15 @@ async function main() {
   }
 
   await prisma.dailyReport.createMany({ data: reports });
+
+  // Algunos usuarios cierran su turno de hoy (ejemplo)
+  const closes = userWorkers.slice(0, 4).map((w, i) => ({
+    userId: w.id,
+    date: new Date(`${nowKey}T00:00:00Z`),
+    shift: i % 2 === 0 ? ("MANANA" as const) : ("TARDE" as const),
+    closedAt: new Date(),
+  }));
+  await prisma.turnoClose.createMany({ data: closes });
 
   // Balance = suma de ganancias de reportes ACEPTADOS por equipo+sitio
   const balanceMap = new Map<string, number>();

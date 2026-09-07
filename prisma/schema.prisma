@@ -12,6 +12,11 @@ datasource db {
   provider = "postgresql"
 }
 
+enum Shift {
+  MANANA
+  TARDE
+}
+
 model Team {
   id       BigInt    @id @default(autoincrement())
   name     String
@@ -46,6 +51,7 @@ model DailyReport {
   websiteId     BigInt?
   website       Website?  @relation(fields: [websiteId], references: [id])
   date          DateTime  @db.Date
+  shift         Shift     @default(MANANA)
   amount        Decimal   @db.Decimal
   status        String    @default("draft")
   sentAt        DateTime?
@@ -60,6 +66,7 @@ model DailyReport {
   @@index([userId, date], name: "idx_reports_user_date")
   @@index([websiteId, date], name: "idx_reports_website_date")
   @@index([status, date], name: "idx_reports_status_date")
+  @@index([websiteId, status, date, shift], name: "idx_reports_blocked_site")
 }
 
 model User {
@@ -76,8 +83,20 @@ model User {
   teamId          BigInt?
   team            Team?         @relation(fields: [teamId], references: [id])
   dailyReports    DailyReport[]
+  turnoCloses     TurnoClose[]
   sessions        Session[]
   accounts        Account[]
+}
+
+model TurnoClose {
+  id       BigInt   @id @default(autoincrement())
+  userId   String
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date     DateTime @db.Date
+  shift    Shift
+  closedAt DateTime @default(now())
+
+  @@unique([userId, date, shift])
 }
 
 model Session {

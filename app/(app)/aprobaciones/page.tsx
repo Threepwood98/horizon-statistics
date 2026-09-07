@@ -34,9 +34,14 @@ export default async function AprobacionesPage() {
     ? reports
     : reports.filter((r) => r.user?.teamId === user.teamId);
 
+  const turnoCloses = await prisma.turnoClose.findMany();
+  const closedKeys = new Set(
+    turnoCloses.map((t) => `${t.userId}:${toKey(t.date)}:${t.shift}`),
+  );
+
   const groups = new Map<string, (typeof visible)[number][]>();
   for (const r of visible) {
-    const key = `${r.userId}:${toKey(r.date)}`;
+    const key = `${r.userId}:${toKey(r.date)}:${r.shift}`;
     const list = groups.get(key) || [];
     list.push(r);
     groups.set(key, list);
@@ -63,6 +68,10 @@ export default async function AprobacionesPage() {
         userName: items[0].user?.name ?? "Desconocido",
         teamName: items[0].user?.team?.name ?? "Sin equipo",
         dateKey: toKey(items[0].date),
+        shift: items[0].shift,
+        closed: closedKeys.has(
+          `${items[0].userId}:${toKey(items[0].date)}:${items[0].shift}`,
+        ),
         rectified: items.some((r) => r.rectified),
         rows,
       };
@@ -79,6 +88,8 @@ export default async function AprobacionesPage() {
         reportIds: g.reportIds,
         userName: g.userName,
         dateKey: g.dateKey,
+        shift: g.shift,
+        closed: g.closed,
         rectified: g.rectified,
         rows: g.rows,
       };
@@ -94,7 +105,7 @@ export default async function AprobacionesPage() {
         });
       }
       return map;
-    }, new Map<string, { id: string; teamName: string; subtotal: number; groups: { id: number; reportIds: number[]; userName: string; dateKey: string; rectified: boolean; rows: { site: string; originalSite: string | null; amount: number; originalAmount: number | null; rectified: boolean }[] }[] }>()),
+    }, new Map<string, { id: string; teamName: string; subtotal: number; groups: { id: number; reportIds: number[]; userName: string; dateKey: string; shift: "MANANA" | "TARDE"; closed: boolean; rectified: boolean; rows: { site: string; originalSite: string | null; amount: number; originalAmount: number | null; rectified: boolean }[] }[] }>()),
     ([, t]) => t,
   ).sort((a, b) => a.teamName.localeCompare(b.teamName));
 

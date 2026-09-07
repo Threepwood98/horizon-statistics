@@ -26,10 +26,18 @@ function keyFromDate(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
-export function DateSwitcher({ value }: { value: string }) {
+export function DateSwitcher({
+  value,
+  turno,
+}: {
+  value: string;
+  turno?: string;
+}) {
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
   const selected = dateFromKey(value);
+
+  const turnoSuffix = turno ? `&turno=${turno}` : "";
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -57,7 +65,7 @@ export function DateSwitcher({ value }: { value: string }) {
           locale={es}
           onSelect={(date) => {
             if (date) {
-              router.push(`/reportes?date=${keyFromDate(date)}`);
+              router.push(`/reportes?date=${keyFromDate(date)}${turnoSuffix}`);
               setOpen(false);
             }
           }}

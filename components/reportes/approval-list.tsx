@@ -7,6 +7,8 @@ import { CheckIcon, RotateCcwIcon, XIcon } from "lucide-react";
 
 import { acceptReport, rejectReport } from "@/lib/actions/reportes";
 import { formatLongDate, formatMoney } from "@/lib/format";
+import { type Shift, shiftLabel } from "@/lib/shift";
+import { LockIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -49,6 +51,8 @@ interface ApprovalGroup {
   reportIds: number[];
   userName: string;
   dateKey: string;
+  shift: Shift;
+  closed: boolean;
   rectified: boolean;
   rows: ApprovalRow[];
 }
@@ -162,8 +166,15 @@ export function ApprovalList({ teams, canManage }: ApprovalListProps) {
                               Rectificado
                             </span>
                           )}
+                          {group.closed && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                              <LockIcon className="size-3" />
+                              Turno cerrado
+                            </span>
+                          )}
                           <span className="text-muted-foreground">
-                            {formatLongDate(group.dateKey)}
+                            {formatLongDate(group.dateKey)} ·{" "}
+                            {shiftLabel(group.shift)}
                           </span>
                           <span className="ml-auto font-semibold tabular-nums">
                             Total {formatMoney(totalAmount)}

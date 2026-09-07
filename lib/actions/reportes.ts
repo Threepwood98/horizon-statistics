@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import prisma from "@/lib/prisma";
 import { auth } from "@/lib/auth";
+import { type Shift } from "@/lib/shift";
 
 type ActionResult = { error?: string; ok?: boolean };
 
@@ -26,20 +27,33 @@ function isManagerOrAdmin(role: string): boolean {
   return role === "manager" || role === "admin";
 }
 
+function isShift(value: unknown): value is Shift {
+  return value === "MANANA" || value === "TARDE";
+}
+
+async function isTurnoClosed(userId: string, date: Date, shift: Shift) {
+  const closed = await prisma.turnoClose.findUnique({
+    where: { userId_date_shift: { userId, date, shift } },
+  });
+  return Boolean(closed);
+}
+
 export async function addReport(input: {
   date: string;
+  shift: Shift;
   websiteId: number;
   amount: number;
 }): Promise<ActionResult> {
-  const { userId } = await requireAuthedUser();
+  const { userId, user } = await requireAuthedUser();
 
   const date = toDateKey(input.date);
   const amount = Number(input.amount);
   const websiteId = Number(input.websiteId);
+  const shift = input.shift;
 
   if (!input.date) return { error: "Indicá la fecha" };
-  if (Number.isNaN(amount) || amount < 0)
-    return { error: "Monto inválido" };
+  if (!isShift(shift)) return { error: "Turno inválido" };
+  if (Number.isNaN(amount) || amount < 0) return { error: "Monto inválido" };
 
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
@@ -49,38 +63,68 @@ export async function addReport(input: {
   const website = await prisma.website.findUnique({ where: { id: websiteId } });
   if (!website) return { error: "Sitio no encontrado" };
 
-  const existingSent = await prisma.dailyReport.findFirst({
-    where: { userId, websiteId, date, status: "sent" },
-  });
-  if (existingSent)
-    return { error: "Ya enviaste este sitio para ese día. Esperá la respuesta del manager." };
+  if (await isTurnoClosed(userId, date, shift))
+    return { error: "Este turno está cerrado. No podés agregar reportes." };
 
-  const existingAccepted = await prisma.dailyReport.findFirst({
-    where: { userId, websiteId, date, status: "accepted" },
-  });
-  if (existingAccepted)
-    return { error: "Ya se aceptó el parte de este sitio para ese día" };
+  const teamScope =
+    user.teamId != null
+      ? { user: { is: { teamId: user.teamId } } }
+      : { userId };
 
-  const draft = await prisma.dailyReport.findFirst({
-    where: { userId, websiteId, date, status: "draft" },
+  // Pendientes de días anteriores bloquean el sitio hasta aceptar el parte.
+  const priorPending = await prisma.dailyReport.findFirst({
+    where: {
+      websiteId,
+      status: { in: ["draft", "sent"] },
+      date: { lt: date },
+      ...teamScope,
+    },
   });
+  if (priorPending)
+    return {
+      error:
+        "El sitio tiene partes sin aceptar de días anteriores. Esperá la actualización del monto.",
+    };
 
-  if (draft) {
+  // Mi propio parte enviado de este sitio+turno → no puedo cargar otro.
+  const ownSent = await prisma.dailyReport.findFirst({
+    where: { userId, websiteId, date, shift, status: "sent" },
+  });
+  if (ownSent)
+    return {
+      error:
+        "Ya enviaste este sitio para este turno. Esperá la respuesta del manager.",
+    };
+
+  // Un solo parte pendiente por (sitio, turno, equipo): bloqueo a pendientes de otros.
+  const otherPending = await prisma.dailyReport.findFirst({
+    where: {
+      websiteId,
+      date,
+      shift,
+      status: { in: ["draft", "sent"] },
+      userId: { not: userId },
+      ...teamScope,
+    },
+  });
+  if (otherPending)
+    return {
+      error:
+        "Tu equipo ya tiene un parte pendiente de este sitio en este turno. Esperá la respuesta del manager.",
+    };
+
+  // Mi borrador propio: acumulo el monto.
+  const ownDraft = await prisma.dailyReport.findFirst({
+    where: { userId, websiteId, date, shift, status: "draft" },
+  });
+  if (ownDraft) {
     await prisma.dailyReport.update({
-      where: { id: draft.id },
-      data: {
-        amount: draft.amount.add(amount),
-      },
+      where: { id: ownDraft.id },
+      data: { amount: ownDraft.amount.add(amount) },
     });
   } else {
     await prisma.dailyReport.create({
-      data: {
-        userId,
-        websiteId,
-        date,
-        amount,
-        status: "draft",
-      },
+      data: { userId, websiteId, date, shift, amount, status: "draft" },
     });
   }
 
@@ -93,6 +137,8 @@ export async function deleteDraft(id: number): Promise<ActionResult> {
   const report = await prisma.dailyReport.findUnique({ where: { id } });
   if (!report || report.userId !== userId || report.status !== "draft")
     return { error: "No podés eliminar ese reporte" };
+  if (await isTurnoClosed(userId, report.date, report.shift))
+    return { error: "Este turno está cerrado. No podés eliminar reportes." };
   await prisma.dailyReport.delete({ where: { id } });
   revalidatePath("/reportes");
   return { ok: true };
@@ -112,8 +158,8 @@ export async function updateReport(
   const report = await prisma.dailyReport.findUnique({ where: { id: reportId } });
   if (!report || report.status !== "draft" || report.userId !== userId)
     return { error: "No podés editar ese reporte" };
-  if (!report.rejectionNote)
-    return { error: "Ese reporte no está rechazado" };
+  if (await isTurnoClosed(userId, report.date, report.shift))
+    return { error: "Este turno está cerrado. No podés editar el reporte." };
 
   if (report.websiteId != null && Number(report.websiteId) !== websiteId) {
     const collision = await prisma.dailyReport.findFirst({
@@ -121,11 +167,12 @@ export async function updateReport(
         userId,
         websiteId,
         date: report.date,
+        shift: report.shift,
         status: { in: ["draft", "sent", "accepted"] },
         NOT: { id: report.id },
       },
     });
-    if (collision) return { error: "Ya tenés un reporte para ese sitio ese día" };
+    if (collision) return { error: "Ya tenés un reporte para ese sitio ese turno" };
   }
 
   await prisma.dailyReport.update({
@@ -137,24 +184,26 @@ export async function updateReport(
   return { ok: true };
 }
 
-export async function sendPart(date: string): Promise<ActionResult> {
+export async function sendPart(
+  date: string,
+  shift: Shift,
+): Promise<ActionResult> {
   const { userId, user } = await requireAuthedUser();
 
   if (user.teamId === null)
     return { error: "No pertenecés a un equipo, no podés enviar el parte" };
 
+  if (await isTurnoClosed(userId, toDateKey(date), shift))
+    return { error: "Este turno está cerrado. No podés enviar el parte." };
+
   const reports = await prisma.dailyReport.findMany({
-    where: { userId, date: toDateKey(date), status: "draft" },
+    where: { userId, date: toDateKey(date), shift, status: "draft" },
   });
   if (reports.length === 0)
-    return { error: "No hay borradores para enviar ese día" };
+    return { error: "No hay borradores para enviar en este turno" };
 
   await prisma.dailyReport.updateMany({
-    where: {
-      userId,
-      date: toDateKey(date),
-      status: "draft",
-    },
+    where: { userId, date: toDateKey(date), shift, status: "draft" },
     data: { status: "sent", sentAt: new Date() },
   });
 
@@ -162,21 +211,53 @@ export async function sendPart(date: string): Promise<ActionResult> {
   return { ok: true };
 }
 
+export async function closeShift(
+  date: string,
+  shift: Shift,
+): Promise<ActionResult> {
+  const { userId } = await requireAuthedUser();
+
+  const drafts = await prisma.dailyReport.count({
+    where: { userId, date: toDateKey(date), shift, status: "draft" },
+  });
+  if (drafts > 0)
+    return {
+      error:
+        "Tenés borradores sin enviar en este turno. Envialos antes de cerrar.",
+    };
+
+  await prisma.turnoClose.upsert({
+    where: { userId_date_shift: { userId, date: toDateKey(date), shift } },
+    create: { userId, date: toDateKey(date), shift },
+    update: {},
+  });
+
+  revalidatePath("/reportes");
+  revalidatePath("/");
+  return { ok: true };
+}
+
 export async function resendRectified(
   date: string,
+  shift: Shift,
   markedRowIds: number[],
 ): Promise<ActionResult> {
   const { userId } = await requireAuthedUser();
 
   const rejected = await prisma.dailyReport.findMany({
-    where: { userId, date: toDateKey(date), status: "draft" },
+    where: {
+      userId,
+      date: toDateKey(date),
+      shift,
+      status: "draft",
+      rejectionNote: { not: null },
+    },
   });
-  const rejectedWithNote = rejected.filter((r) => r.rejectionNote);
-  if (rejectedWithNote.length === 0)
-    return { error: "No hay reportes rechazados para ese día" };
+  if (rejected.length === 0)
+    return { error: "No hay reportes rechazados para ese turno" };
 
   const markedSet = new Set(markedRowIds.map(Number));
-  for (const r of rejectedWithNote) {
+  for (const r of rejected) {
     if (!markedSet.has(Number(r.id))) continue;
     const originalAmount = r.originalAmount != null ? Number(r.originalAmount) : null;
     const originalWebsiteId =
@@ -194,7 +275,7 @@ export async function resendRectified(
   }
 
   await prisma.dailyReport.updateMany({
-    where: { id: { in: rejectedWithNote.map((r) => r.id) } },
+    where: { id: { in: rejected.map((r) => r.id) } },
     data: { status: "sent", sentAt: new Date(), rectified: true, rejectionNote: null, marked: false },
   });
 
@@ -274,13 +355,18 @@ export async function rejectReport(
 
   const markedSet = new Set((markedRowIds ?? []).map(Number));
   const dayReports = await prisma.dailyReport.findMany({
-    where: { userId: report.userId, date: report.date, status: "sent" },
+    where: {
+      userId: report.userId,
+      date: report.date,
+      shift: report.shift,
+      status: "sent",
+    },
   });
   if (dayReports.length === 0)
     return { error: "Ese parte no está pendiente de aprobación" };
 
-  await prisma.$transaction(
-    dayReports.map((r) =>
+  await prisma.$transaction([
+    ...dayReports.map((r) =>
       prisma.dailyReport.update({
         where: { id: r.id },
         data: {
@@ -296,7 +382,15 @@ export async function rejectReport(
         },
       }),
     ),
-  );
+    // Reabre el turno para que el trabajador pueda rectificar.
+    prisma.turnoClose.deleteMany({
+      where: {
+        userId: report.userId!,
+        date: report.date,
+        shift: report.shift,
+      },
+    }),
+  ]);
 
   revalidatePath("/reportes");
   revalidatePath("/aprobaciones");

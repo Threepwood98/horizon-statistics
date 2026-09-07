@@ -1,8 +1,10 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getRange, toKey, addDaysKey, formatDateLabelUTC, localDateKey } from "@/lib/range";
+import type { Prisma } from "@/app/generated/prisma/client";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { isShiftParam, shiftFromParam } from "@/lib/shift";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { DailyChart } from "@/components/dashboard/daily-chart";
 import { SiteBreakdown } from "@/components/dashboard/site-breakdown";
@@ -10,6 +12,7 @@ import { RecentHistory } from "@/components/dashboard/recent-history";
 import { Balance } from "@/components/dashboard/balance";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 import { RangeSelector } from "@/components/dashboard/range-selector";
+import { ScopeFilters } from "@/components/dashboard/scope-filters";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   DollarSignIcon,
@@ -21,7 +24,14 @@ import {
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ range?: string; from?: string; to?: string }>;
+  searchParams: Promise<{
+    range?: string;
+    from?: string;
+    to?: string;
+    equipo?: string;
+    usuario?: string;
+    turno?: string;
+  }>;
 }) {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect("/login");
@@ -36,8 +46,45 @@ export default async function DashboardPage({
     where: { id: session.user.id },
     include: { team: true },
   });
+  if (!user) redirect("/login");
+
+  const role = user.role;
+  const isWorker = role === "user";
+  const isLeader = role === "leader";
+  const isGlobal = role === "manager" || role === "admin";
+
+  const shiftFilter = isShiftParam(sp.turno) ? shiftFromParam(sp.turno) : null;
+
+  const dataScope: Prisma.DailyReportWhereInput = {};
+  if (isWorker) {
+    dataScope.userId = user.id;
+  } else if (isLeader) {
+    if (user.teamId != null) dataScope.user = { is: { teamId: user.teamId } };
+  } else {
+    if (sp.usuario) dataScope.userId = sp.usuario;
+    else if (sp.equipo && /^\d+$/.test(sp.equipo))
+      dataScope.user = { is: { teamId: BigInt(sp.equipo) } };
+  }
+  if (shiftFilter) dataScope.shift = shiftFilter;
+
+  const balanceTeamId: bigint | null =
+    isWorker || isLeader
+      ? user.teamId
+      : sp.equipo && /^\d+$/.test(sp.equipo)
+        ? BigInt(sp.equipo)
+        : null;
+
+  const liveScope: Prisma.DailyReportWhereInput | null =
+    balanceTeamId != null
+      ? {
+          user: { is: { teamId: balanceTeamId } },
+          ...(shiftFilter ? { shift: shiftFilter } : {}),
+        }
+      : null;
 
   const [
+    teams,
+    users,
     rangeReports,
     statsHistory,
     todayReports,
@@ -45,37 +92,47 @@ export default async function DashboardPage({
     balances,
     todayLiveReports,
   ] = await Promise.all([
+    isGlobal
+      ? prisma.team.findMany({ orderBy: { name: "asc" } })
+      : Promise.resolve([] as Awaited<ReturnType<typeof prisma.team.findMany>>),
+    isGlobal
+      ? prisma.user.findMany({
+          orderBy: { name: "asc" },
+          include: { team: { select: { name: true } } },
+        })
+      : Promise.resolve([]),
     prisma.dailyReport.findMany({
-      where: { date: where, status: "accepted" },
+      where: { date: where, status: "accepted", ...dataScope },
       include: { website: true, user: true },
       orderBy: { date: "desc" },
     }),
     prisma.dailyReport.groupBy({
       by: ["date"],
-      where: { status: "accepted" },
+      where: { status: "accepted", ...dataScope },
       _sum: { amount: true },
     }),
     prisma.dailyReport.findMany({
-      where: { date: todayStart, status: "accepted" },
+      where: { date: todayStart, status: "accepted", ...dataScope },
     }),
     prisma.dailyReport.findMany({
-      where: { status: "accepted" },
+      where: { status: "accepted", ...dataScope },
       include: { website: true, user: true },
       orderBy: { date: "desc" },
       take: 10,
     }),
-    user?.teamId != null
+    balanceTeamId != null
       ? prisma.balance.findMany({
-          where: { teamId: user.teamId },
+          where: { teamId: balanceTeamId },
           include: { website: true },
           orderBy: { balance: "desc" },
         })
       : Promise.resolve([]),
-    user?.teamId != null
+    liveScope != null
       ? prisma.dailyReport.findMany({
           where: {
             date: todayStart,
             status: { in: ["draft", "sent"] },
+            ...liveScope,
           },
           include: { website: true, user: true },
         })
@@ -155,12 +212,10 @@ export default async function DashboardPage({
     amount: Number(r.amount),
   }));
 
-  const teamId = user?.teamId ?? null;
+  const teamId = balanceTeamId;
 
   const liveGainBySite = new Map<string, number>();
   for (const r of todayLiveReports) {
-    if (teamId == null) break;
-    if (r.user?.teamId !== teamId) continue;
     const name = r.website?.name || "Sin sitio";
     const gain = Number(r.amount);
     liveGainBySite.set(name, (liveGainBySite.get(name) || 0) + gain);
@@ -177,9 +232,9 @@ export default async function DashboardPage({
   return (
     <>
       <DashboardHeader
-        userName={user?.name ?? ""}
-        teamName={user?.team?.name ?? ""}
-        role={user?.role}
+        userName={user.name}
+        teamName={user.team?.name ?? ""}
+        role={role}
       />
 
       <div className="mt-6 grid gap-4 grid-cols-2 lg:grid-cols-4">
@@ -209,8 +264,23 @@ export default async function DashboardPage({
         />
       </div>
 
-      <div className="mt-6">
+      <div className="mt-6 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <RangeSelector range={range} from={sp.from} to={sp.to} />
+        {isGlobal && (
+          <ScopeFilters
+            teams={teams.map((t) => ({ id: String(t.id), name: t.name }))}
+            users={users.map((u) => ({
+              id: u.id,
+              name: u.name ?? "Usuario",
+              teamName: u.team?.name ?? null,
+            }))}
+            equipo={sp.equipo}
+            usuario={sp.usuario}
+            turno={
+              isShiftParam(sp.turno) ? sp.turno : undefined
+            }
+          />
+        )}
       </div>
 
       <div className="mt-4 grid gap-6 lg:grid-cols-2">
@@ -229,11 +299,11 @@ export default async function DashboardPage({
         </Card>
       </div>
 
-      {balanceRows.length > 0 && user?.team && (
+      {teamId != null && (
         <div className="mt-6">
           <Balance
             balances={balanceRows}
-            teamName={user.team.name}
+            teamName={user.team?.name ?? "Equipo seleccionado"}
             className="max-w-2xl"
           />
         </div>

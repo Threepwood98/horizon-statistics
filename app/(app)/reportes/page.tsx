@@ -1,15 +1,12 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import {
-  CheckCircle2Icon,
   ClipboardCheckIcon,
   ClipboardClockIcon,
-  ClipboardIcon,
   ClipboardListIcon,
   ClipboardPlusIcon,
   ClipboardXIcon,
   PencilIcon,
-  XCircleIcon,
 } from "lucide-react";
 
 import { auth } from "@/lib/auth";
@@ -22,6 +19,14 @@ import {
   toKey,
 } from "@/lib/range";
 import {
+  type Shift,
+  shiftFromParam,
+  shiftLabel,
+  shiftParamFromDate,
+  isShiftParam,
+  type ShiftParam,
+} from "@/lib/shift";
+import {
   Card,
   CardContent,
   CardDescription,
@@ -29,11 +34,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { DateSwitcher } from "@/components/reportes/date-switcher";
+import { TurnoSwitch } from "@/components/reportes/turno-switch";
 import { ReportDialog } from "@/components/reportes/report-dialog";
 import { DraftList } from "@/components/reportes/draft-list";
 import { SentReports } from "@/components/reportes/sent-reports";
 import { RejectedReportDialog } from "@/components/reportes/rejected-report-dialog";
 import { AcceptedHistory } from "@/components/reportes/accepted-history";
+import { type SiteOption } from "@/components/reportes/report-form";
 import { Badge } from "@/components/ui/badge";
 
 export default async function ReportesPage({
@@ -41,6 +48,7 @@ export default async function ReportesPage({
 }: {
   searchParams: Promise<{
     date?: string;
+    turno?: string;
     range?: string;
     from?: string;
     to?: string;
@@ -66,6 +74,11 @@ export default async function ReportesPage({
   };
   const rejectedRange = getRange(sp, now, "rej");
 
+  const turnoParam: ShiftParam = isShiftParam(sp.turno)
+    ? sp.turno
+    : shiftParamFromDate(now);
+  const shift: Shift = shiftFromParam(turnoParam);
+
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
     include: { team: true },
@@ -74,10 +87,17 @@ export default async function ReportesPage({
 
   const role = user.role;
   const isGlobal = role === "manager" || role === "admin";
+  const teamScope =
+    user.teamId != null
+      ? { user: { is: { teamId: user.teamId } } }
+      : { userId: user.id };
 
-  const [websites, balances, drafts, sentList, acceptedHistory] =
+  const websites = await prisma.website.findMany({ orderBy: { name: "asc" } });
+  const websiteIds = websites.map((w) => w.id);
+
+  const [balances, drafts, sentList, acceptedHistory, turnoClose,
+    priorPendingRows, shiftPendingRows, prevShiftPendingRows] =
     await Promise.all([
-      prisma.website.findMany({ orderBy: { name: "asc" } }),
       user.teamId != null
         ? prisma.balance.findMany({
             where: { teamId: user.teamId },
@@ -85,12 +105,22 @@ export default async function ReportesPage({
           })
         : Promise.resolve([]),
       prisma.dailyReport.findMany({
-        where: { userId: user.id, date: dateStart, status: "draft" },
+        where: {
+          userId: user.id,
+          date: dateStart,
+          shift,
+          status: "draft",
+        },
         include: { website: true },
         orderBy: { id: "asc" },
       }),
       prisma.dailyReport.findMany({
-        where: { userId: user.id, date: dateStart, status: "sent" },
+        where: {
+          userId: user.id,
+          date: dateStart,
+          shift,
+          status: "sent",
+        },
         include: { website: true },
         orderBy: { id: "asc" },
       }),
@@ -106,6 +136,40 @@ export default async function ReportesPage({
         },
         orderBy: [{ date: "desc" }, { id: "asc" }],
       }),
+      prisma.turnoClose.findUnique({
+        where: { userId_date_shift: { userId: user.id, date: dateStart, shift } },
+      }),
+      prisma.dailyReport.findMany({
+        where: {
+          websiteId: { in: websiteIds },
+          date: { lt: dateStart },
+          status: { in: ["draft", "sent"] },
+          ...teamScope,
+        },
+        select: { websiteId: true },
+      }),
+      prisma.dailyReport.findMany({
+        where: {
+          websiteId: { in: websiteIds },
+          date: dateStart,
+          shift,
+          status: { in: ["draft", "sent"] },
+          ...teamScope,
+        },
+        select: { websiteId: true, userId: true, status: true },
+      }),
+      shift === "TARDE"
+        ? prisma.dailyReport.findMany({
+            where: {
+              websiteId: { in: websiteIds },
+              date: dateStart,
+              shift: "MANANA",
+              status: { in: ["draft", "sent"] },
+              ...teamScope,
+            },
+            select: { websiteId: true },
+          })
+        : Promise.resolve([]),
     ]);
 
   const balanceBySite = new Map<bigint, number>();
@@ -120,10 +184,57 @@ export default async function ReportesPage({
     temporalesBySite.set(r.websiteId, prev + Number(r.amount));
   }
 
-  const sites = websites.map((w) => {
+  const priorPendingSites = new Set<bigint>();
+  for (const r of priorPendingRows) if (r.websiteId != null) priorPendingSites.add(r.websiteId);
+  const prevShiftPendingSites = new Set<bigint>();
+  for (const r of prevShiftPendingRows)
+    if (r.websiteId != null) prevShiftPendingSites.add(r.websiteId);
+  const ownDraftSites = new Set<bigint>();
+  for (const r of drafts) if (r.websiteId != null) ownDraftSites.add(r.websiteId);
+  const blockedShiftSites = new Set<bigint>();
+  for (const r of shiftPendingRows) {
+    if (r.websiteId == null) continue;
+    const mine = r.userId === user.id;
+    if (!mine && r.status === "draft") blockedShiftSites.add(r.websiteId);
+    if (r.status === "sent") blockedShiftSites.add(r.websiteId);
+  }
+
+  const sites: SiteOption[] = websites.map((w) => {
     const approved = balanceBySite.get(w.id) ?? 0;
     const partial = temporalesBySite.get(w.id) ?? 0;
     const balanceInicio = Math.round((approved + partial) * 100) / 100;
+    if (priorPendingSites.has(w.id))
+      return {
+        id: Number(w.id),
+        name: w.name,
+        balanceInicio,
+        blocked: true,
+        warning:
+          "Tiene partes sin aceptar de días anteriores. Esperá la actualización del monto.",
+      };
+    if (blockedShiftSites.has(w.id))
+      return {
+        id: Number(w.id),
+        name: w.name,
+        balanceInicio,
+        blocked: true,
+        warning:
+          "El sitio ya tiene un parte pendiente en este turno por tu equipo.",
+      };
+    if (ownDraftSites.has(w.id))
+      return {
+        id: Number(w.id),
+        name: w.name,
+        balanceInicio,
+        note: "Ya tenés un borrador para este sitio en este turno: los montos se suman.",
+      };
+    if (prevShiftPendingSites.has(w.id))
+      return {
+        id: Number(w.id),
+        name: w.name,
+        balanceInicio,
+        note: "El parte de la mañana de este sitio está pendiente. El monto de inicio puede no estar actualizado.",
+      };
     return { id: Number(w.id), name: w.name, balanceInicio };
   });
 
@@ -158,6 +269,7 @@ export default async function ReportesPage({
     userName: string;
     teamName: string;
     dateKey: string;
+    shift: Shift;
     totalAmount: number;
     rows: {
       id: number;
@@ -173,7 +285,7 @@ export default async function ReportesPage({
 
   const rejectedGroups = Array.from(
     rejectedHistory.reduce((map, r) => {
-      const key = `${r.userId}:${toKey(r.date)}`;
+      const key = `${r.userId}:${toKey(r.date)}:${r.shift}`;
       const existing = map.get(key);
       const row = {
         id: Number(r.id),
@@ -199,6 +311,7 @@ export default async function ReportesPage({
             r.user?.displayUsername || r.user?.name || "Usuario",
           teamName: r.user?.team?.name ?? "Sin equipo",
           dateKey: toKey(r.date),
+          shift: r.shift,
           totalAmount: row.amount,
           rows: [row],
         });
@@ -206,13 +319,25 @@ export default async function ReportesPage({
       return map;
     }, new Map<string, RejectedGroup>()),
     ([, g]) => g,
-  ).sort((a, b) => (a.dateKey < b.dateKey ? 1 : a.dateKey > b.dateKey ? -1 : 0));
+  ).sort(
+    (a, b) =>
+      a.dateKey < b.dateKey
+        ? 1
+        : a.dateKey > b.dateKey
+          ? -1
+          : a.shift === b.shift
+            ? 0
+            : a.shift < b.shift
+              ? -1
+              : 1,
+  );
 
   type AcceptedGroup = {
     id: string;
     userName: string;
     teamName: string;
     dateKey: string;
+    shift: Shift;
     totalAmount: number;
     sites: { site: string; amount: number }[];
   };
@@ -220,7 +345,7 @@ export default async function ReportesPage({
   const acceptedGroups = Array.from(
     acceptedHistory.reduce((map, r) => {
       const currentUser = r.user;
-      const key = `${r.userId}:${toKey(r.date)}`;
+      const key = `${r.userId}:${toKey(r.date)}:${r.shift}`;
       const existing = map.get(key);
       const entry = {
         site: r.website?.name ?? "Sin sitio",
@@ -236,6 +361,7 @@ export default async function ReportesPage({
             currentUser?.displayUsername || currentUser?.name || "Usuario",
           teamName: currentUser?.team?.name ?? "Sin equipo",
           dateKey: toKey(r.date),
+          shift: r.shift,
           totalAmount: entry.amount,
           sites: [entry],
         });
@@ -243,8 +369,17 @@ export default async function ReportesPage({
       return map;
     }, new Map<string, AcceptedGroup>()),
     ([, a]) => a,
-  ).sort((a, b) =>
-    a.dateKey < b.dateKey ? 1 : a.dateKey > b.dateKey ? -1 : 0,
+  ).sort(
+    (a, b) =>
+      a.dateKey < b.dateKey
+        ? 1
+        : a.dateKey > b.dateKey
+          ? -1
+          : a.shift === b.shift
+            ? 0
+            : a.shift < b.shift
+              ? -1
+              : 1,
   );
 
   return (
@@ -255,14 +390,19 @@ export default async function ReportesPage({
             <ClipboardListIcon />
             Mis reportes
           </h1>
+          <p className="text-sm text-muted-foreground">
+            Turno {shiftLabel(shift)}
+          </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <TurnoSwitch turno={turnoParam} date={dateKey} />
           <ReportDialog
             sites={sites}
             date={dateKey}
+            shift={shift}
             rangeLabel={formatDateLabelUTC(dateKey)}
           />
-          <DateSwitcher value={dateKey} />
+          <DateSwitcher value={dateKey} turno={turnoParam} />
         </div>
       </div>
 
@@ -273,10 +413,18 @@ export default async function ReportesPage({
               <ClipboardPlusIcon />
               <CardTitle className="text-base">Reportes Parciales</CardTitle>
             </div>
-            <CardDescription>Sumatoria de los reportes del día</CardDescription>
+            <CardDescription>
+              Sumatoria de los reportes del turno {shiftLabel(shift)}
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <DraftList drafts={partialRows} date={dateKey} />
+            <DraftList
+              drafts={partialRows}
+              date={dateKey}
+              shift={shift}
+              closed={Boolean(turnoClose)}
+              sites={sites}
+            />
           </CardContent>
         </Card>
 

@@ -12,17 +12,20 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { ReportForm } from "@/components/reportes/report-form";
+import { ReportForm, type SiteOption } from "@/components/reportes/report-form";
+import { type Shift, shiftLabel } from "@/lib/shift";
 
 interface ReportDialogProps {
-  sites: { id: number; name: string; balanceInicio: number }[];
+  sites: SiteOption[];
   date: string;
+  shift: Shift;
   rangeLabel: string;
 }
 
 export function ReportDialog({
   sites,
   date,
+  shift,
   rangeLabel,
 }: ReportDialogProps) {
   const [open, setOpen] = React.useState(false);
@@ -41,13 +44,14 @@ export function ReportDialog({
         <DialogHeader>
           <DialogTitle>Agregar reporte</DialogTitle>
           <DialogDescription>
-            {rangeLabel} · Si cargás el mismo sitio varias veces el mismo día,
-            los montos se suman.
+            {rangeLabel} · Turno {shiftLabel(shift)} · Si cargás el mismo sitio
+            varias veces en el mismo turno, los montos se suman.
           </DialogDescription>
         </DialogHeader>
         <ReportForm
           sites={sites}
           date={date}
+          shift={shift}
           onSuccess={() => setOpen(false)}
         />
       </DialogContent>

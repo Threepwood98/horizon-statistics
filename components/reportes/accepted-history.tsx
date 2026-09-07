@@ -1,6 +1,7 @@
 import { CalendarDaysIcon } from "lucide-react";
 
 import { formatLongDate, formatMoney } from "@/lib/format";
+import { type Shift, shiftLabel } from "@/lib/shift";
 import {
   RangeSelector,
   type RangeKey,
@@ -26,6 +27,7 @@ export interface AcceptedGroup {
   userName: string;
   teamName: string;
   dateKey: string;
+  shift: Shift;
   totalAmount: number;
   sites: { site: string; amount: number }[];
 }
@@ -65,6 +67,9 @@ export function AcceptedHistory({
                   <span>{group.teamName}</span>
                   <span className="inline-flex items-center gap-1 text-muted-foreground">
                     {formatLongDate(group.dateKey)}
+                  </span>
+                  <span className="text-muted-foreground">
+                    {shiftLabel(group.shift)}
                   </span>
                   <span className="ml-auto font-semibold tabular-nums">
                     Total {formatMoney(group.totalAmount)}

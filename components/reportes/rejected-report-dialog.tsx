@@ -7,6 +7,7 @@ import { AlertTriangleIcon, PencilIcon, SendIcon } from "lucide-react";
 
 import { resendRectified } from "@/lib/actions/reportes";
 import { formatLongDate, formatMoney } from "@/lib/format";
+import { type Shift, shiftLabel } from "@/lib/shift";
 import {
   RangeSelector,
   type RangeKey,
@@ -35,7 +36,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { ReportForm } from "@/components/reportes/report-form";
+import { ReportForm, type SiteOption } from "@/components/reportes/report-form";
 import { cn } from "@/lib/utils";
 
 interface RejectedRow {
@@ -54,13 +55,14 @@ export interface RejectedGroup {
   userName: string;
   teamName: string;
   dateKey: string;
+  shift: Shift;
   totalAmount: number;
   rows: RejectedRow[];
 }
 
 interface RejectedReportDialogProps {
   groups: RejectedGroup[];
-  sites: { id: number; name: string; balanceInicio: number }[];
+  sites: SiteOption[];
   showName: boolean;
   range: RangeKey;
   from?: string;
@@ -81,6 +83,7 @@ export function RejectedReportDialog({
   const [editing, setEditing] = React.useState<{
     row: RejectedRow;
     dateKey: string;
+    shift: Shift;
   } | null>(null);
   const [isPending, startTransition] = useTransition();
   const [pendingId, setPendingId] = React.useState<string | null>(null);
@@ -92,6 +95,7 @@ export function RejectedReportDialog({
     startTransition(async () => {
       const result = await resendRectified(
         group.dateKey,
+        group.shift,
         group.rows.filter((r) => r.marked).map((r) => r.id),
       );
       setPendingId(null);
@@ -136,6 +140,9 @@ export function RejectedReportDialog({
                     <span>{group.teamName}</span>
                     <span className="inline-flex items-center gap-1 text-muted-foreground">
                       {formatLongDate(group.dateKey)}
+                    </span>
+                    <span className="text-muted-foreground">
+                      {shiftLabel(group.shift)}
                     </span>
                     <span className="ml-auto font-semibold tabular-nums">
                       Total {formatMoney(group.totalAmount)}
@@ -209,6 +216,7 @@ export function RejectedReportDialog({
                                     setEditing({
                                       row: r,
                                       dateKey: group.dateKey,
+                                      shift: group.shift,
                                     })
                                   }
                                 >
@@ -269,6 +277,7 @@ export function RejectedReportDialog({
             <ReportForm
               sites={sites}
               date={editing.dateKey}
+              shift={editing.shift}
               reportId={editing.row.id}
               initial={{
                 websiteId: editing.row.websiteId,

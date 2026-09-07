@@ -6,6 +6,7 @@ import { useTransition } from "react";
 import { PlusIcon, SaveIcon } from "lucide-react";
 
 import { addReport, updateReport } from "@/lib/actions/reportes";
+import { type Shift } from "@/lib/shift";
 import { Button } from "@/components/ui/button";
 import {
   Field,
@@ -23,9 +24,19 @@ import {
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 
+export interface SiteOption {
+  id: number;
+  name: string;
+  balanceInicio: number;
+  blocked?: boolean;
+  warning?: string;
+  note?: string;
+}
+
 interface ReportFormProps {
-  sites: { id: number; name: string; balanceInicio: number }[];
+  sites: SiteOption[];
   date: string;
+  shift: Shift;
   reportId?: number;
   initial?: { websiteId: number; amount: number };
   onSuccess?: () => void;
@@ -34,6 +45,7 @@ interface ReportFormProps {
 export function ReportForm({
   sites,
   date,
+  shift,
   reportId,
   initial,
   onSuccess,
@@ -58,6 +70,7 @@ export function ReportForm({
           })
         : await addReport({
             date,
+            shift,
             websiteId: Number(websiteId),
             amount: Number(amount),
           });
@@ -71,7 +84,7 @@ export function ReportForm({
     });
   };
 
-  const ready = Boolean(websiteId) && amount !== "";
+  const ready = Boolean(websiteId) && amount !== "" && !selectedSite?.blocked;
 
   return (
     <form onSubmit={(e) => { e.preventDefault(); submit(); }} className="flex flex-col gap-4">
@@ -85,13 +98,25 @@ export function ReportForm({
             <SelectContent>
               <SelectGroup>
                 {sites.map((s) => (
-                  <SelectItem key={s.id} value={String(s.id)}>
+                  <SelectItem
+                    key={s.id}
+                    value={String(s.id)}
+                    disabled={s.blocked}
+                  >
                     {s.name}
                   </SelectItem>
                 ))}
               </SelectGroup>
             </SelectContent>
           </Select>
+          {selectedSite?.blocked && selectedSite.warning && (
+            <p className="mt-1 text-sm text-destructive">
+              {selectedSite.warning}
+            </p>
+          )}
+          {selectedSite?.note && !selectedSite.blocked && (
+            <p className="mt-1 text-sm text-amber-600">{selectedSite.note}</p>
+          )}
         </Field>
 
         <div className="grid grid-cols-2 gap-3">
