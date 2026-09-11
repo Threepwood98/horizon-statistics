@@ -109,7 +109,7 @@ export function RejectedReportDialog({
 
   return (
     <div className="space-y-3">
-      <RangeSelector range={range} from={from} to={to} prefix={prefix} />
+      {/* <RangeSelector range={range} from={from} to={to} prefix={prefix} /> */}
 
       {groups.length === 0 ? (
         <p className="text-sm text-muted-foreground">

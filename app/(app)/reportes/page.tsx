@@ -18,11 +18,7 @@ import {
   getRange,
   toKey,
 } from "@/lib/range";
-import {
-  type Shift,
-  shiftFromDate,
-  shiftLabel,
-} from "@/lib/shift";
+import { type Shift, shiftFromDate, shiftLabel } from "@/lib/shift";
 import {
   Card,
   CardContent,
@@ -37,6 +33,7 @@ import { RejectedReportDialog } from "@/components/reportes/rejected-report-dial
 import { AcceptedHistory } from "@/components/reportes/accepted-history";
 import { type SiteOption } from "@/components/reportes/report-form";
 import { Badge } from "@/components/ui/badge";
+import { RangeSelector } from "@/components/dashboard/range-selector";
 
 export default async function ReportesPage({
   searchParams,
@@ -82,82 +79,89 @@ export default async function ReportesPage({
   const websites = await prisma.website.findMany({ orderBy: { name: "asc" } });
   const websiteIds = websites.map((w) => w.id);
 
-  const [balances, drafts, sentList, acceptedHistory, turnoClose,
-    priorPendingRows, shiftPendingRows, prevShiftPendingRows] =
-    await Promise.all([
-      user.teamId != null
-        ? prisma.balance.findMany({
-            where: { teamId: user.teamId },
-            select: { websiteId: true, balance: true },
-          })
-        : Promise.resolve([]),
-      prisma.dailyReport.findMany({
-        where: {
-          userId: user.id,
-          date: dateStart,
-          shift,
-          status: "draft",
-        },
-        include: { website: true },
-        orderBy: { id: "asc" },
-      }),
-      prisma.dailyReport.findMany({
-        where: {
-          userId: user.id,
-          date: dateStart,
-          shift,
-          status: "sent",
-        },
-        include: { website: true },
-        orderBy: { id: "asc" },
-      }),
-      prisma.dailyReport.findMany({
-        where: {
-          ...(isGlobal ? {} : { userId: user.id }),
-          date: where,
-          status: "accepted",
-        },
-        include: {
-          website: true,
-          user: { include: { team: true } },
-        },
-        orderBy: [{ date: "desc" }, { id: "asc" }],
-      }),
-      prisma.turnoClose.findUnique({
-        where: { userId_date_shift: { userId: user.id, date: dateStart, shift } },
-      }),
-      prisma.dailyReport.findMany({
-        where: {
-          websiteId: { in: websiteIds },
-          date: { lt: dateStart },
-          status: { in: ["draft", "sent"] },
-          ...teamScope,
-        },
-        select: { websiteId: true },
-      }),
-      prisma.dailyReport.findMany({
-        where: {
-          websiteId: { in: websiteIds },
-          date: dateStart,
-          shift,
-          status: { in: ["draft", "sent"] },
-          ...teamScope,
-        },
-        select: { websiteId: true, userId: true, status: true },
-      }),
-      shift === "TARDE"
-        ? prisma.dailyReport.findMany({
-            where: {
-              websiteId: { in: websiteIds },
-              date: dateStart,
-              shift: "MANANA",
-              status: { in: ["draft", "sent"] },
-              ...teamScope,
-            },
-            select: { websiteId: true },
-          })
-        : Promise.resolve([]),
-    ]);
+  const [
+    balances,
+    drafts,
+    sentList,
+    acceptedHistory,
+    turnoClose,
+    priorPendingRows,
+    shiftPendingRows,
+    prevShiftPendingRows,
+  ] = await Promise.all([
+    user.teamId != null
+      ? prisma.balance.findMany({
+          where: { teamId: user.teamId },
+          select: { websiteId: true, balance: true },
+        })
+      : Promise.resolve([]),
+    prisma.dailyReport.findMany({
+      where: {
+        userId: user.id,
+        date: dateStart,
+        shift,
+        status: "draft",
+      },
+      include: { website: true },
+      orderBy: { id: "asc" },
+    }),
+    prisma.dailyReport.findMany({
+      where: {
+        userId: user.id,
+        date: dateStart,
+        shift,
+        status: "sent",
+      },
+      include: { website: true },
+      orderBy: { id: "asc" },
+    }),
+    prisma.dailyReport.findMany({
+      where: {
+        ...(isGlobal ? {} : { userId: user.id }),
+        date: where,
+        status: "accepted",
+      },
+      include: {
+        website: true,
+        user: { include: { team: true } },
+      },
+      orderBy: [{ date: "desc" }, { id: "asc" }],
+    }),
+    prisma.turnoClose.findUnique({
+      where: { userId_date_shift: { userId: user.id, date: dateStart, shift } },
+    }),
+    prisma.dailyReport.findMany({
+      where: {
+        websiteId: { in: websiteIds },
+        date: { lt: dateStart },
+        status: { in: ["draft", "sent"] },
+        ...teamScope,
+      },
+      select: { websiteId: true },
+    }),
+    prisma.dailyReport.findMany({
+      where: {
+        websiteId: { in: websiteIds },
+        date: dateStart,
+        shift,
+        status: { in: ["draft", "sent"] },
+        ...teamScope,
+      },
+      select: { websiteId: true, userId: true, status: true },
+    }),
+    shift === "TARDE"
+      ? prisma.dailyReport.findMany({
+          where: {
+            websiteId: { in: websiteIds },
+            date: dateStart,
+            shift: "MANANA",
+            status: { in: ["draft", "sent"] },
+            ...teamScope,
+          },
+          select: { websiteId: true },
+        })
+      : Promise.resolve([]),
+  ]);
 
   const balanceBySite = new Map<bigint, number>();
   for (const b of balances) {
@@ -172,12 +176,14 @@ export default async function ReportesPage({
   }
 
   const priorPendingSites = new Set<bigint>();
-  for (const r of priorPendingRows) if (r.websiteId != null) priorPendingSites.add(r.websiteId);
+  for (const r of priorPendingRows)
+    if (r.websiteId != null) priorPendingSites.add(r.websiteId);
   const prevShiftPendingSites = new Set<bigint>();
   for (const r of prevShiftPendingRows)
     if (r.websiteId != null) prevShiftPendingSites.add(r.websiteId);
   const ownDraftSites = new Set<bigint>();
-  for (const r of drafts) if (r.websiteId != null) ownDraftSites.add(r.websiteId);
+  for (const r of drafts)
+    if (r.websiteId != null) ownDraftSites.add(r.websiteId);
   const blockedShiftSites = new Set<bigint>();
   for (const r of shiftPendingRows) {
     if (r.websiteId == null) continue;
@@ -294,8 +300,7 @@ export default async function ReportesPage({
       } else {
         map.set(key, {
           id: key,
-          userName:
-            r.user?.displayUsername || r.user?.name || "Usuario",
+          userName: r.user?.displayUsername || r.user?.name || "Usuario",
           teamName: r.user?.team?.name ?? "Sin equipo",
           dateKey: toKey(r.date),
           shift: r.shift,
@@ -306,17 +311,16 @@ export default async function ReportesPage({
       return map;
     }, new Map<string, RejectedGroup>()),
     ([, g]) => g,
-  ).sort(
-    (a, b) =>
-      a.dateKey < b.dateKey
-        ? 1
-        : a.dateKey > b.dateKey
-          ? -1
-          : a.shift === b.shift
-            ? 0
-            : a.shift < b.shift
-              ? -1
-              : 1,
+  ).sort((a, b) =>
+    a.dateKey < b.dateKey
+      ? 1
+      : a.dateKey > b.dateKey
+        ? -1
+        : a.shift === b.shift
+          ? 0
+          : a.shift < b.shift
+            ? -1
+            : 1,
   );
 
   type AcceptedGroup = {
@@ -356,21 +360,20 @@ export default async function ReportesPage({
       return map;
     }, new Map<string, AcceptedGroup>()),
     ([, a]) => a,
-  ).sort(
-    (a, b) =>
-      a.dateKey < b.dateKey
-        ? 1
-        : a.dateKey > b.dateKey
-          ? -1
-          : a.shift === b.shift
-            ? 0
-            : a.shift < b.shift
-              ? -1
-              : 1,
+  ).sort((a, b) =>
+    a.dateKey < b.dateKey
+      ? 1
+      : a.dateKey > b.dateKey
+        ? -1
+        : a.shift === b.shift
+          ? 0
+          : a.shift < b.shift
+            ? -1
+            : 1,
   );
 
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col gap-4">
       <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
@@ -391,7 +394,7 @@ export default async function ReportesPage({
         </div>
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+      <div className="mt-6 grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <div className="flex gap-2">
@@ -428,7 +431,7 @@ export default async function ReportesPage({
           </CardContent>
         </Card>
 
-        <Card>
+        {/* <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <ClipboardCheckIcon />
@@ -447,10 +450,11 @@ export default async function ReportesPage({
               to={to}
             />
           </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
+        </Card> */}
+      </div>
+      <Card>
+        <CardHeader className="grid gap-2 lg:grid-cols-2">
+          <div>
             <CardTitle className="flex gap-2 text-base">
               <ClipboardXIcon />
               Reporte Rechazado
@@ -459,23 +463,31 @@ export default async function ReportesPage({
               Rechazado por el manager. Haz click en{" "}
               <Badge variant="secondary" className="text-sm">
                 <PencilIcon /> editar
-              </Badge>
-              {" "}para corregirlos.
+              </Badge>{" "}
+              para corregirlos.
             </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <RejectedReportDialog
-              groups={rejectedGroups}
-              sites={sites}
-              showName={isGlobal}
+          </div>
+          <div className="flex lg:justify-end lg:items-start">
+            <RangeSelector
               range={rejectedRange.range}
               from={sp.rejFrom}
               to={sp.rejTo}
               prefix="rej"
             />
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <RejectedReportDialog
+            groups={rejectedGroups}
+            sites={sites}
+            showName={isGlobal}
+            range={rejectedRange.range}
+            from={sp.rejFrom}
+            to={sp.rejTo}
+            prefix="rej"
+          />
+        </CardContent>
+      </Card>
     </div>
   );
 }
