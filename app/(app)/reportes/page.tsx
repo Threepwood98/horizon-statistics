@@ -20,11 +20,8 @@ import {
 } from "@/lib/range";
 import {
   type Shift,
-  shiftFromParam,
+  shiftFromDate,
   shiftLabel,
-  shiftParamFromDate,
-  isShiftParam,
-  type ShiftParam,
 } from "@/lib/shift";
 import {
   Card,
@@ -33,8 +30,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { DateSwitcher } from "@/components/reportes/date-switcher";
-import { TurnoSwitch } from "@/components/reportes/turno-switch";
 import { ReportDialog } from "@/components/reportes/report-dialog";
 import { DraftList } from "@/components/reportes/draft-list";
 import { SentReports } from "@/components/reportes/sent-reports";
@@ -47,8 +42,6 @@ export default async function ReportesPage({
   searchParams,
 }: {
   searchParams: Promise<{
-    date?: string;
-    turno?: string;
     range?: string;
     from?: string;
     to?: string;
@@ -61,12 +54,9 @@ export default async function ReportesPage({
   if (!session) redirect("/login");
 
   const sp = await searchParams;
-  const dateKey =
-    sp.date && /^\d{4}-\d{2}-\d{2}$/.test(sp.date)
-      ? sp.date
-      : localDateKey(new Date());
-  const dateStart = utcStart(dateKey);
   const now = new Date();
+  const dateKey = localDateKey(now);
+  const dateStart = utcStart(dateKey);
   const { range, where, from, to } = {
     ...getRange(sp, now),
     from: sp.from,
@@ -74,10 +64,7 @@ export default async function ReportesPage({
   };
   const rejectedRange = getRange(sp, now, "rej");
 
-  const turnoParam: ShiftParam = isShiftParam(sp.turno)
-    ? sp.turno
-    : shiftParamFromDate(now);
-  const shift: Shift = shiftFromParam(turnoParam);
+  const shift: Shift = shiftFromDate(now);
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
@@ -391,18 +378,16 @@ export default async function ReportesPage({
             Mis reportes
           </h1>
           <p className="text-sm text-muted-foreground">
-            Turno {shiftLabel(shift)}
+            Turno {shiftLabel(shift)} · {formatDateLabelUTC(dateKey)}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <TurnoSwitch turno={turnoParam} date={dateKey} />
           <ReportDialog
             sites={sites}
             date={dateKey}
             shift={shift}
             rangeLabel={formatDateLabelUTC(dateKey)}
           />
-          <DateSwitcher value={dateKey} turno={turnoParam} />
         </div>
       </div>
 
