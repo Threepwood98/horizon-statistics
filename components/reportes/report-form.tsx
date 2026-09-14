@@ -8,12 +8,12 @@ import { PlusIcon, SaveIcon } from "lucide-react";
 import { addReport, updateReport } from "@/lib/actions/reportes";
 import { type Shift } from "@/lib/shift";
 import { Button } from "@/components/ui/button";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import {
-  Field,
-  FieldGroup,
-  FieldLabel,
-} from "@/components/ui/field";
-import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@/components/ui/input-group";
 import {
   Select,
   SelectContent,
@@ -54,11 +54,15 @@ export function ReportForm({
   const [websiteId, setWebsiteId] = React.useState<string | null>(
     initial ? String(initial.websiteId) : null,
   );
-  const [amount, setAmount] = React.useState(initial ? String(initial.amount) : "");
+  const [amount, setAmount] = React.useState(
+    initial ? String(initial.amount) : "",
+  );
   const [error, setError] = React.useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const selectedSite = sites.find((s) => websiteId != null && String(s.id) === websiteId);
+  const selectedSite = sites.find(
+    (s) => websiteId != null && String(s.id) === websiteId,
+  );
 
   const submit = () => {
     setError(null);
@@ -87,61 +91,39 @@ export function ReportForm({
   const ready = Boolean(websiteId) && amount !== "" && !selectedSite?.blocked;
 
   return (
-    <form onSubmit={(e) => { e.preventDefault(); submit(); }} className="flex flex-col gap-4">
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        submit();
+      }}
+      className="flex flex-col gap-4"
+    >
       <FieldGroup>
-        <Field>
-          <FieldLabel htmlFor="report-site">Sitio</FieldLabel>
-          <Select value={websiteId} onValueChange={setWebsiteId}>
-            <SelectTrigger id="report-site" className="w-full">
-              <SelectValue placeholder="Elegir sitio" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                {sites.map((s) => (
-                  <SelectItem
-                    key={s.id}
-                    value={String(s.id)}
-                    disabled={s.blocked}
-                  >
-                    {s.name}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-          {selectedSite?.blocked && selectedSite.warning && (
-            <p className="mt-1 text-sm text-destructive">
-              {selectedSite.warning}
-            </p>
-          )}
-          {selectedSite?.note && !selectedSite.blocked && (
-            <p className="mt-1 text-sm text-amber-600">{selectedSite.note}</p>
-          )}
-        </Field>
-
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-2">
           <Field>
-            <FieldLabel htmlFor="report-start">Inicio</FieldLabel>
-            <InputGroup>
-              <InputGroupAddon>
-                $
-              </InputGroupAddon>
-              <InputGroupInput
-                id="report-start"
-                value={
-                  selectedSite ? selectedSite.balanceInicio.toFixed(2) : ""
-                }
-                placeholder="0.00"
-                readOnly
-              />
-            </InputGroup>
+            <FieldLabel htmlFor="report-site">Sitio</FieldLabel>
+            <Select value={websiteId} onValueChange={setWebsiteId}>
+              <SelectTrigger id="report-site" className="w-full">
+                <SelectValue placeholder="Elegir sitio" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {sites.map((s) => (
+                    <SelectItem
+                      key={s.id}
+                      value={String(s.id)}
+                    >
+                      {s.name}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
           </Field>
           <Field>
             <FieldLabel htmlFor="report-amount">Monto</FieldLabel>
             <InputGroup>
-              <InputGroupAddon>
-                $
-              </InputGroupAddon>
+              <InputGroupAddon>$</InputGroupAddon>
               <InputGroupInput
                 id="report-amount"
                 type="number"
@@ -156,6 +138,16 @@ export function ReportForm({
           </Field>
         </div>
       </FieldGroup>
+      <span className="text-muted-foreground text-sm">
+        Monto Actual:{" "}
+        {selectedSite ? selectedSite.balanceInicio.toFixed(2) : "$ 0.00"}
+      </span>
+      {selectedSite?.blocked && selectedSite.warning && (
+        <p className="mt-1 text-sm text-destructive">{selectedSite.warning}</p>
+      )}
+      {selectedSite?.note && !selectedSite.blocked && (
+        <p className="mt-1 text-sm text-amber-600">{selectedSite.note}</p>
+      )}
 
       {error && <p className="text-sm text-destructive">{error}</p>}
 

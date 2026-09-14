@@ -28,7 +28,7 @@ function isManagerOrAdmin(role: string): boolean {
 }
 
 function isShift(value: unknown): value is Shift {
-  return value === "MANANA" || value === "TARDE";
+  return value === "AM" || value === "PM";
 }
 
 async function isTurnoClosed(userId: string, date: Date, shift: Shift) {

@@ -34,19 +34,18 @@ export function ReportDialog({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
         render={
-          <Button>
+          <Button size="icon-lg" className="rounded-full">
             <PlusIcon />
-            Nuevo reporte
           </Button>
         }
       />
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Agregar reporte</DialogTitle>
-          <DialogDescription>
+          <DialogTitle>Agregar importe</DialogTitle>
+          {/* <DialogDescription>
             {rangeLabel} · Turno {shiftLabel(shift)} · Si cargás el mismo sitio
             varias veces en el mismo turno, los montos se suman.
-          </DialogDescription>
+          </DialogDescription> */}
         </DialogHeader>
         <ReportForm
           sites={sites}

@@ -21,6 +21,7 @@ import {
 import { type Shift, shiftFromDate, shiftLabel } from "@/lib/shift";
 import {
   Card,
+  CardAction,
   CardContent,
   CardDescription,
   CardHeader,
@@ -149,12 +150,12 @@ export default async function ReportesPage({
       },
       select: { websiteId: true, userId: true, status: true },
     }),
-    shift === "TARDE"
+    shift === "PM"
       ? prisma.dailyReport.findMany({
           where: {
             websiteId: { in: websiteIds },
             date: dateStart,
-            shift: "MANANA",
+            shift: "AM",
             status: { in: ["draft", "sent"] },
             ...teamScope,
           },
@@ -374,36 +375,22 @@ export default async function ReportesPage({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
-            <ClipboardListIcon />
-            Mis reportes
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Turno {shiftLabel(shift)} · {formatDateLabelUTC(dateKey)}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <ReportDialog
-            sites={sites}
-            date={dateKey}
-            shift={shift}
-            rangeLabel={formatDateLabelUTC(dateKey)}
-          />
-        </div>
-      </div>
-
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <div className="flex gap-2">
-              <ClipboardPlusIcon />
-              <CardTitle className="text-base">Reportes Parciales</CardTitle>
+              <ClipboardListIcon />
+              <CardTitle className="text-base">Reporte</CardTitle>
             </div>
-            <CardDescription>
-              Sumatoria de los reportes del turno {shiftLabel(shift)}
-            </CardDescription>
+            <CardDescription>Sumatoria del reporte</CardDescription>
+            <CardAction>
+              <ReportDialog
+                sites={sites}
+                date={dateKey}
+                shift={shift}
+                rangeLabel={formatDateLabelUTC(dateKey)}
+              />
+            </CardAction>
           </CardHeader>
           <CardContent>
             <DraftList

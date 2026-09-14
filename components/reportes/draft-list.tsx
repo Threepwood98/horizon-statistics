@@ -3,14 +3,9 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
-import {
-  LockIcon,
-  PencilIcon,
-  SendIcon,
-  TrashIcon,
-} from "lucide-react";
+import { LockIcon, PencilIcon, SendIcon, TrashIcon } from "lucide-react";
 
-import { closeShift, deleteDraft, sendPart } from "@/lib/actions/reportes";
+import { deleteDraft, sendPart } from "@/lib/actions/reportes";
 import { formatLongDate, formatMoney } from "@/lib/format";
 import { type Shift, shiftLabel } from "@/lib/shift";
 import { Button } from "@/components/ui/button";
@@ -30,7 +25,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ReportForm, type SiteOption } from "@/components/reportes/report-form";
-import { Spinner } from "@/components/ui/spinner";
 
 interface DraftRow {
   id: number;
@@ -63,7 +57,6 @@ export function DraftList({
   const [error, setError] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
   const [isPending, startTransition] = useTransition();
-  const [closePending, setClosePending] = React.useState(false);
   const [editing, setEditing] = React.useState<DraftRow | null>(null);
 
   const remove = (id: number) => {
@@ -94,20 +87,6 @@ export function DraftList({
     });
   };
 
-  const close = () => {
-    setError(null);
-    setClosePending(true);
-    startTransition(async () => {
-      const result = await closeShift(date, shift);
-      setClosePending(false);
-      if (result?.error) {
-        setError(result.error);
-        return;
-      }
-      router.refresh();
-    });
-  };
-
   const totalAmount = drafts.reduce((s, d) => s + d.amount, 0);
   const turnoLabel = shiftLabel(shift);
   const actionsDisabled = busy || closed;
@@ -119,23 +98,6 @@ export function DraftList({
           No hay reportes para este turno.
         </p>
         {error && <p className="text-sm text-destructive">{error}</p>}
-        {closed && (
-          <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
-            <LockIcon className="size-4" /> Turno cerrado
-          </p>
-        )}
-        {!closed && !hideSend && (
-          <Button
-            type="button"
-            variant="outline"
-            onClick={close}
-            disabled={closePending}
-            className="w-full sm:w-fit self-end"
-          >
-            {closePending ? <Spinner /> : <LockIcon />}
-            {closePending ? "Cerrando…" : `Cerrar turno ${turnoLabel}`}
-          </Button>
-        )}
       </div>
     );
   }
@@ -211,20 +173,12 @@ export function DraftList({
 
       {closed ? (
         <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
-          <LockIcon className="size-4" /> Turno cerrado el {formatLongDate(date)}
+          <LockIcon className="size-4" /> Turno cerrado el{" "}
+          {formatLongDate(date)}
         </p>
       ) : (
         !hideSend && (
           <div className="flex flex-wrap justify-end gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={close}
-              disabled={busy || closePending}
-            >
-              {closePending ? <Spinner /> : <LockIcon />}
-              {closePending ? "Cerrando…" : `Cerrar turno ${turnoLabel}`}
-            </Button>
             <Button
               type="button"
               onClick={send}
@@ -237,7 +191,10 @@ export function DraftList({
         )
       )}
 
-      <Dialog open={editing != null} onOpenChange={(o) => !o && setEditing(null)}>
+      <Dialog
+        open={editing != null}
+        onOpenChange={(o) => !o && setEditing(null)}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Editar reporte parcial</DialogTitle>

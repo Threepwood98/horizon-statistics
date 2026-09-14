@@ -13,8 +13,8 @@ datasource db {
 }
 
 enum Shift {
-  MANANA
-  TARDE
+  AM
+  PM
 }
 
 model Team {
@@ -51,7 +51,7 @@ model DailyReport {
   websiteId     BigInt?
   website       Website?  @relation(fields: [websiteId], references: [id])
   date          DateTime  @db.Date
-  shift         Shift     @default(MANANA)
+  shift         Shift     @default(AM)
   amount        Decimal   @db.Decimal
   status        String    @default("draft")
   sentAt        DateTime?

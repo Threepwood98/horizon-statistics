@@ -10,3 +10,12 @@ export function formatLongDate(dateKey: string): string {
     timeZone: "UTC",
   });
 }
+
+export function formatShortDate(dateKey: string): string {
+  return new Date(`${dateKey}T00:00:00Z`).toLocaleDateString("es-ES", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}

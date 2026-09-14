@@ -108,25 +108,25 @@ export function ScopeFilters({
           type="button"
           className={cn(
             BASE,
-            turno === "manana"
+            turno === "am"
               ? "bg-primary text-primary-foreground"
               : "text-muted-foreground",
           )}
-          onClick={() => route({ key: "turno", value: "manana" })}
+          onClick={() => route({ key: "turno", value: "am" })}
         >
-          Mañana
+          AM
         </button>
         <button
           type="button"
           className={cn(
             BASE,
-            turno === "tarde"
+            turno === "pm"
               ? "bg-primary text-primary-foreground"
               : "text-muted-foreground",
           )}
-          onClick={() => route({ key: "turno", value: "tarde" })}
+          onClick={() => route({ key: "turno", value: "pm" })}
         >
-          Tarde
+          PM
         </button>
       </div>
 

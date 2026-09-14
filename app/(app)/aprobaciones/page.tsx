@@ -105,7 +105,7 @@ export default async function AprobacionesPage() {
         });
       }
       return map;
-    }, new Map<string, { id: string; teamName: string; subtotal: number; groups: { id: number; reportIds: number[]; userName: string; dateKey: string; shift: "MANANA" | "TARDE"; closed: boolean; rectified: boolean; rows: { site: string; originalSite: string | null; amount: number; originalAmount: number | null; rectified: boolean }[] }[] }>()),
+    }, new Map<string, { id: string; teamName: string; subtotal: number; groups: { id: number; reportIds: number[]; userName: string; dateKey: string; shift: "AM" | "PM"; closed: boolean; rectified: boolean; rows: { site: string; originalSite: string | null; amount: number; originalAmount: number | null; rectified: boolean }[] }[] }>()),
     ([, t]) => t,
   ).sort((a, b) => a.teamName.localeCompare(b.teamName));
 

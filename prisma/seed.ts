@@ -126,15 +126,14 @@ async function main() {
       for (let j = 0; j < reportsForDay; j++) {
         const website = websites[Math.floor(Math.random() * websites.length)];
         const amount = 5 + Math.random() * 80;
-        const shift = (Math.random() < 0.5 ? "MANANA" : "TARDE") as "MANANA" | "TARDE";
+        const shift = (Math.random() < 0.5 ? "AM" : "PM") as "AM" | "PM";
 
         let status: "accepted" | "sent" | "draft";
         if (isToday) {
           // hoy: pendientes de aprobación o borradores
           status = Math.random() < 0.4 ? "sent" : "draft";
         } else {
-          const roll = Math.random();
-          status = roll < 0.75 ? "accepted" : roll < 0.9 ? "sent" : "draft";
+          status = "accepted";
         }
 
         reports.push({
@@ -160,7 +159,7 @@ async function main() {
   const closes = userWorkers.slice(0, 4).map((w, i) => ({
     userId: w.id,
     date: new Date(`${nowKey}T00:00:00Z`),
-    shift: i % 2 === 0 ? ("MANANA" as const) : ("TARDE" as const),
+    shift: i % 2 === 0 ? ("AM" as const) : ("PM" as const),
     closedAt: new Date(),
   }));
   await prisma.turnoClose.createMany({ data: closes });

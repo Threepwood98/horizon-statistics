@@ -1,28 +1,28 @@
-export type Shift = "MANANA" | "TARDE";
+export type Shift = "AM" | "PM";
 
-const SHIFT_PARAM = ["manana", "tarde"] as const;
+const SHIFT_PARAM = ["am", "pm"] as const;
 export type ShiftParam = (typeof SHIFT_PARAM)[number];
 
 export function shiftFromDate(date: Date): Shift {
-  return date.getHours() < 14 ? "MANANA" : "TARDE";
+  return date.getHours() < 14 ? "AM" : "PM";
 }
 
 export function shiftParamFromDate(date: Date): ShiftParam {
-  return date.getHours() < 14 ? "manana" : "tarde";
+  return date.getHours() < 14 ? "am" : "pm";
 }
 
 export function shiftLabel(shift: Shift): string {
-  return shift === "MANANA" ? "Mañana" : "Tarde";
+  return shift === "AM" ? "AM" : "PM";
 }
 
 export function shiftParamFromParam(value: string | undefined): ShiftParam {
-  return isShiftParam(value) ? value : "manana";
+  return isShiftParam(value) ? value : "am";
 }
 
 export function shiftFromParam(param: ShiftParam | undefined): Shift {
-  return param === "tarde" ? "TARDE" : "MANANA";
+  return param === "pm" ? "PM" : "AM";
 }
 
 export function isShiftParam(value: string | undefined): value is ShiftParam {
-  return value === "manana" || value === "tarde";
+  return value === "am" || value === "pm";
 }
