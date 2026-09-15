@@ -21,6 +21,13 @@ export function localDateKey(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
+export function dateFromKey(key: string | undefined): Date | undefined {
+  if (!key) return undefined;
+  const [y, m, d] = key.split("-").map(Number);
+  if (!y || !m || !d) return undefined;
+  return new Date(y, m - 1, d);
+}
+
 export function utcStart(key: string): Date {
   return new Date(`${key}T00:00:00Z`);
 }

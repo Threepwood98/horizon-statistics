@@ -7,27 +7,21 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { ReportForm, type SiteOption } from "@/components/reportes/report-form";
-import { type Shift, shiftLabel } from "@/lib/shift";
+import { ReportForm } from "@/components/reportes/report-form";
+import type { SiteOption } from "@/lib/reports-shapes";
+import { type Shift } from "@/lib/shift";
 
 interface ReportDialogProps {
   sites: SiteOption[];
   date: string;
   shift: Shift;
-  rangeLabel: string;
 }
 
-export function ReportDialog({
-  sites,
-  date,
-  shift,
-  rangeLabel,
-}: ReportDialogProps) {
+export function ReportDialog({ sites, date, shift }: ReportDialogProps) {
   const [open, setOpen] = React.useState(false);
 
   return (
@@ -42,10 +36,6 @@ export function ReportDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Agregar importe</DialogTitle>
-          {/* <DialogDescription>
-            {rangeLabel} · Turno {shiftLabel(shift)} · Si cargás el mismo sitio
-            varias veces en el mismo turno, los montos se suman.
-          </DialogDescription> */}
         </DialogHeader>
         <ReportForm
           sites={sites}

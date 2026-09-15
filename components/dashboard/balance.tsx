@@ -58,9 +58,7 @@ export function Balance({ balances, teamName, className }: BalanceProps) {
                     {formatMoney(a.historic)}
                   </TableCell>
                   <TableCell className="text-right tabular-nums font-medium">
-                    {Math.abs(a.live - a.historic) < 0.000001
-                      ? formatMoney(a.live)
-                      : formatMoney(a.live)}
+                    {formatMoney(a.live)}
                   </TableCell>
                 </TableRow>
               ))}

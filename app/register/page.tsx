@@ -1,8 +1,11 @@
+import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
-import { RegisterForm } from "@/components/register-form";
+import { RegisterForm } from "@/components/auth/register-form";
+
+export const metadata: Metadata = { title: "Crear cuenta" };
 
 export default async function RegisterPage() {
   const [session, userCount] = await Promise.all([

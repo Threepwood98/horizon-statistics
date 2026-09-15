@@ -15,6 +15,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { dateFromKey, localDateKey } from "@/lib/range";
 
 export type RangeKey = "week" | "month" | "custom";
 
@@ -23,20 +24,6 @@ interface RangeSelectorProps {
   from?: string;
   to?: string;
   prefix?: string;
-}
-
-function keyFromDate(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
-function dateFromKey(key: string | undefined): Date | undefined {
-  if (!key) return undefined;
-  const [y, m, d] = key.split("-").map(Number);
-  if (!y || !m || !d) return undefined;
-  return new Date(y, m - 1, d);
 }
 
 function rangeFromKeys(from?: string, to?: string): DateRange | undefined {
@@ -56,11 +43,13 @@ export function RangeSelector({ range, from, to, prefix = "" }: RangeSelectorPro
   const [dateRange, setDateRange] = React.useState<DateRange | undefined>(
     rangeFromKeys(from, to),
   );
+  const [synced, setSynced] = React.useState({ range, from, to });
 
-  React.useEffect(() => {
+  if (synced.range !== range || synced.from !== from || synced.to !== to) {
+    setSynced({ range, from, to });
     setActive(range);
     setDateRange(rangeFromKeys(from, to));
-  }, [range, from, to]);
+  }
 
   const route = (nextRange: RangeKey, nextFrom?: string, nextTo?: string) => {
     const params = new URLSearchParams(window.location.search);
@@ -90,7 +79,7 @@ export function RangeSelector({ range, from, to, prefix = "" }: RangeSelectorPro
 
   const apply = () => {
     if (!dateRange?.from || !dateRange?.to) return;
-    route("custom", keyFromDate(dateRange.from), keyFromDate(dateRange.to));
+    route("custom", localDateKey(dateRange.from), localDateKey(dateRange.to));
   };
 
   return (

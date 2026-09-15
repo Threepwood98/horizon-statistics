@@ -1,6 +1,7 @@
-"use client";
+import type { Metadata } from "next";
+import { LoginForm } from "@/components/auth/login-form";
 
-import { LoginForm } from "@/components/login-form";
+export const metadata: Metadata = { title: "Ingresar" };
 
 export default function LoginPage() {
   return (

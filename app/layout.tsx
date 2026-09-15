@@ -17,7 +17,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Horizon Online Works",
+  title: {
+    default: "Horizon Online Works",
+    template: "%s · Horizon Online Works",
+  },
   description: "Panel de estadísticas y reportes de Horizon Online Works",
 };
 

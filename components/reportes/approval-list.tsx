@@ -5,9 +5,10 @@ import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { CheckIcon, RotateCcwIcon, XIcon } from "lucide-react";
 
-import { acceptReport, rejectReport } from "@/lib/actions/reportes";
+import { approvePart, rejectReport } from "@/lib/actions/reportes";
 import { formatLongDate, formatMoney } from "@/lib/format";
-import { type Shift, shiftLabel } from "@/lib/shift";
+import { shiftLabel } from "@/lib/shift";
+import type { ApprovalGroup, TeamGroup } from "@/lib/reports-shapes";
 import { LockIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -38,32 +39,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-interface ApprovalRow {
-  site: string;
-  originalSite: string | null;
-  amount: number;
-  originalAmount: number | null;
-  rectified: boolean;
-}
-
-interface ApprovalGroup {
-  id: number;
-  reportIds: number[];
-  userName: string;
-  dateKey: string;
-  shift: Shift;
-  closed: boolean;
-  rectified: boolean;
-  rows: ApprovalRow[];
-}
-
-interface TeamGroup {
-  id: string;
-  teamName: string;
-  subtotal: number;
-  groups: ApprovalGroup[];
-}
-
 interface ApprovalListProps {
   teams: TeamGroup[];
   canManage: boolean;
@@ -90,12 +65,10 @@ export function ApprovalList({ teams, canManage }: ApprovalListProps) {
   const accept = (group: ApprovalGroup) => {
     setError(null);
     startTransition(async () => {
-      for (const id of group.reportIds) {
-        const result = await acceptReport(id);
-        if (result?.error) {
-          setError(result.error);
-          return;
-        }
+      const result = await approvePart(group.reportIds);
+      if (result?.error) {
+        setError(result.error);
+        return;
       }
       router.refresh();
     });

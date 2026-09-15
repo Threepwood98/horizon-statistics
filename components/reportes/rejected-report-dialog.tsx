@@ -8,10 +8,7 @@ import { AlertTriangleIcon, PencilIcon, SendIcon } from "lucide-react";
 import { resendRectified } from "@/lib/actions/reportes";
 import { formatLongDate, formatMoney } from "@/lib/format";
 import { type Shift, shiftLabel } from "@/lib/shift";
-import {
-  RangeSelector,
-  type RangeKey,
-} from "@/components/dashboard/range-selector";
+import type { RejectedGroup, RejectedRow } from "@/lib/reports-shapes";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -36,48 +33,20 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { ReportForm, type SiteOption } from "@/components/reportes/report-form";
+import { ReportForm } from "@/components/reportes/report-form";
+import type { SiteOption } from "@/lib/reports-shapes";
 import { cn } from "@/lib/utils";
-
-interface RejectedRow {
-  id: number;
-  websiteId: number;
-  site: string;
-  amount: number;
-  rejectionNote: string | null;
-  marked: boolean;
-  originalAmount: number | null;
-  originalSite: string | null;
-}
-
-export interface RejectedGroup {
-  id: string;
-  userName: string;
-  teamName: string;
-  dateKey: string;
-  shift: Shift;
-  totalAmount: number;
-  rows: RejectedRow[];
-}
 
 interface RejectedReportDialogProps {
   groups: RejectedGroup[];
   sites: SiteOption[];
   showName: boolean;
-  range: RangeKey;
-  from?: string;
-  to?: string;
-  prefix?: string;
 }
 
 export function RejectedReportDialog({
   groups,
   sites,
   showName,
-  range,
-  from,
-  to,
-  prefix,
 }: RejectedReportDialogProps) {
   const router = useRouter();
   const [editing, setEditing] = React.useState<{
@@ -109,8 +78,6 @@ export function RejectedReportDialog({
 
   return (
     <div className="space-y-3">
-      {/* <RangeSelector range={range} from={from} to={to} prefix={prefix} /> */}
-
       {groups.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           No hay reportes rechazados en el rango seleccionado.

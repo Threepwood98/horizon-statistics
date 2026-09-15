@@ -2,8 +2,8 @@
 
 import * as React from "react";
 
-import { NavMain } from "@/components/nav-main";
-import { NavUser } from "@/components/nav-user";
+import { NavMain } from "@/components/layout/nav-main";
+import { NavUser } from "@/components/layout/nav-user";
 import {
   Sidebar,
   SidebarContent,
@@ -19,6 +19,8 @@ import {
   ClipboardListIcon,
   BadgeCheckIcon,
 } from "lucide-react";
+import Link from "next/link";
+import { canApproveRole } from "@/lib/roles";
 
 export function AppSidebar({
   user,
@@ -30,8 +32,7 @@ export function AppSidebar({
   role?: string;
   appTitle?: string;
 }) {
-  const canApprove =
-    role === "leader" || role === "manager" || role === "admin";
+  const canApprove = canApproveRole(role ?? "");
 
   const realNav = [
     {
@@ -62,7 +63,7 @@ export function AppSidebar({
           <SidebarMenuItem>
             <SidebarMenuButton
               className="data-[slot=sidebar-menu-button]:p-1.5!"
-              render={<a href="/" />}
+              render={<Link href="/" />}
             >
               <CommandIcon className="size-5!" />
               <span className="text-base font-semibold">{appTitle}</span>

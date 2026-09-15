@@ -1,7 +1,6 @@
 export type Shift = "AM" | "PM";
 
-const SHIFT_PARAM = ["am", "pm"] as const;
-export type ShiftParam = (typeof SHIFT_PARAM)[number];
+export type ShiftParam = "am" | "pm";
 
 export function shiftFromDate(date: Date): Shift {
   return date.getHours() < 14 ? "AM" : "PM";
@@ -13,6 +12,10 @@ export function shiftParamFromDate(date: Date): ShiftParam {
 
 export function shiftLabel(shift: Shift): string {
   return shift === "AM" ? "AM" : "PM";
+}
+
+export function shiftSpanish(shift: Shift): string {
+  return shift === "AM" ? "MAÑANA" : "TARDE";
 }
 
 export function shiftParamFromParam(value: string | undefined): ShiftParam {

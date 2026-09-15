@@ -8,7 +8,7 @@ import { toast } from "sonner";
 
 import { closeShift } from "@/lib/actions/reportes";
 import { formatShortDate } from "@/lib/format";
-import { type Shift } from "@/lib/shift";
+import { type Shift, shiftSpanish } from "@/lib/shift";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Separator } from "@/components/ui/separator";
@@ -35,7 +35,7 @@ export function SiteHeader({
         ? "Mis reportes"
         : pathname === "/aprobaciones"
           ? "Aprobaciones"
-          : "Documents";
+          : "Inicio";
 
   const close = () => {
     startTransition(async () => {
@@ -49,7 +49,7 @@ export function SiteHeader({
     });
   };
 
-  const turnoLabel = shift === "AM" ? "MAÑANA" : "TARDE";
+  const turnoLabel = shiftSpanish(shift);
 
   return (
     <header className="flex h-(--header-height) shrink-0 items-center border-b transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-(--header-height)">

@@ -53,7 +53,6 @@ export function SiteBreakdown({
   rangeLabel,
   className,
 }: SiteBreakdownProps) {
-  const total = data.reduce((acc, site) => acc + site.total, 0);
   const bestSite = data.reduce<SiteData | null>(
     (best, site) => (best === null || site.total > best.total ? site : best),
     null,

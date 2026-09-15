@@ -24,7 +24,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ReportForm, type SiteOption } from "@/components/reportes/report-form";
+import { ReportForm } from "@/components/reportes/report-form";
+import type { SiteOption } from "@/lib/reports-shapes";
 
 interface DraftRow {
   id: number;

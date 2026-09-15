@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { PlusIcon, InboxIcon } from "lucide-react";
-import { LogoutButton } from "@/components/logout-button";
+import { LogoutButton } from "@/components/auth/logout-button";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 

@@ -1,6 +1,6 @@
 import { CheckCircle2Icon, ClockIcon } from "lucide-react";
 
-import { formatMoney } from "@/lib/format";
+import { formatFullDate, formatMoney } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -23,16 +23,6 @@ interface SentReportsProps {
   date: string;
   accepted?: boolean;
   showHeader?: boolean;
-}
-
-function formatFullDate(key: string): string {
-  return new Date(`${key}T00:00:00Z`).toLocaleDateString("es-ES", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC",
-  });
 }
 
 export function SentReports({

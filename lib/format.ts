@@ -19,3 +19,13 @@ export function formatShortDate(dateKey: string): string {
     timeZone: "UTC",
   });
 }
+
+export function formatFullDate(dateKey: string): string {
+  return new Date(`${dateKey}T00:00:00Z`).toLocaleDateString("es-ES", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}

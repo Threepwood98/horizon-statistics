@@ -7,6 +7,7 @@ import { PlusIcon, SaveIcon } from "lucide-react";
 
 import { addReport, updateReport } from "@/lib/actions/reportes";
 import { type Shift } from "@/lib/shift";
+import type { SiteOption } from "@/lib/reports-shapes";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import {
@@ -23,15 +24,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
-
-export interface SiteOption {
-  id: number;
-  name: string;
-  balanceInicio: number;
-  blocked?: boolean;
-  warning?: string;
-  note?: string;
-}
 
 interface ReportFormProps {
   sites: SiteOption[];

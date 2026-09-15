@@ -51,16 +51,16 @@ export function LoginForm({
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
         <CardHeader>
-          <CardTitle>Login to your account</CardTitle>
+          <CardTitle>Ingresar a tu cuenta</CardTitle>
           <CardDescription>
-            Enter your credential below to login to your account
+            Ingresá tus credenciales para continuar
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={onSubmit}>
             <FieldGroup>
               <Field>
-                <FieldLabel htmlFor="username">User</FieldLabel>
+                <FieldLabel htmlFor="username">Usuario</FieldLabel>
                 <Input
                   id="username"
                   value={username}
@@ -71,13 +71,7 @@ export function LoginForm({
               </Field>
               <Field>
                 <div className="flex items-center">
-                  <FieldLabel htmlFor="password">Password</FieldLabel>
-                  {/* <a
-                    href="#"
-                    className="ml-auto inline-block text-sm underline-offset-4 hover:underline"
-                  >
-                    Forgot your password?
-                  </a> */}
+                  <FieldLabel htmlFor="password">Contraseña</FieldLabel>
                 </div>
                 <Input
                   id="password"
@@ -90,12 +84,12 @@ export function LoginForm({
               </Field>
               <Field>
                 <Button type="submit" disabled={loading}>
-                  {loading ? "Login..." : "Login"}
+                  {loading ? "Ingresando..." : "Ingresar"}
                 </Button>
-                {/* <FieldDescription className="text-center">
-                  Don&apos;t have an account? <a href="#">Sign up</a>
-                </FieldDescription> */}
               </Field>
+              {error && (
+                <FieldDescription data-invalid>{error}</FieldDescription>
+              )}
             </FieldGroup>
           </form>
         </CardContent>

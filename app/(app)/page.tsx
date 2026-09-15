@@ -1,9 +1,9 @@
-import { headers } from "next/headers";
-import { redirect } from "next/navigation";
+import type { Metadata } from "next";
 import { getRange, toKey, addDaysKey, formatDateLabelUTC, localDateKey } from "@/lib/range";
 import type { Prisma } from "@/app/generated/prisma/client";
-import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { getCurrentUser } from "@/lib/session";
+import { isGlobalRole, isLeader, isWorker } from "@/lib/roles";
 import { isShiftParam, shiftFromParam } from "@/lib/shift";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { DailyChart } from "@/components/dashboard/daily-chart";
@@ -21,6 +21,8 @@ import {
   CalendarCheckIcon,
 } from "lucide-react";
 
+export const metadata: Metadata = { title: "Dashboard" };
+
 export default async function DashboardPage({
   searchParams,
 }: {
@@ -33,32 +35,25 @@ export default async function DashboardPage({
     turno?: string;
   }>;
 }) {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session) redirect("/login");
+  const { user } = await getCurrentUser();
 
   const sp = await searchParams;
+
+  const role = user.role;
+  const isWorkerRole = isWorker(role);
+  const isLeaderRole = isLeader(role);
+  const isGlobal = isGlobalRole(role);
   const now = new Date();
   const { range, where, rangeLabel } = getRange(sp, now);
   const todayKey = localDateKey(now);
   const todayStart = new Date(`${todayKey}T00:00:00Z`);
 
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    include: { team: true },
-  });
-  if (!user) redirect("/login");
-
-  const role = user.role;
-  const isWorker = role === "user";
-  const isLeader = role === "leader";
-  const isGlobal = role === "manager" || role === "admin";
-
   const shiftFilter = isShiftParam(sp.turno) ? shiftFromParam(sp.turno) : null;
 
   const dataScope: Prisma.DailyReportWhereInput = {};
-  if (isWorker) {
+  if (isWorkerRole) {
     dataScope.userId = user.id;
-  } else if (isLeader) {
+  } else if (isLeaderRole) {
     if (user.teamId != null) dataScope.user = { is: { teamId: user.teamId } };
   } else {
     if (sp.usuario) dataScope.userId = sp.usuario;
@@ -68,7 +63,7 @@ export default async function DashboardPage({
   if (shiftFilter) dataScope.shift = shiftFilter;
 
   const balanceTeamId: bigint | null =
-    isWorker || isLeader
+    isWorkerRole || isLeaderRole
       ? user.teamId
       : sp.equipo && /^\d+$/.test(sp.equipo)
         ? BigInt(sp.equipo)
